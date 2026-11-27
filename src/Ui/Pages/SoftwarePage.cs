@@ -101,11 +101,47 @@ namespace OneCLicenseInspector.Ui
                 if (f.IsUnlimited) seatUnlimited = true;
                 else seatSum += f.LimitNum > 0 ? f.LimitNum : 0;
             }
+            int clientTotal = 0;
+            int serverTotal = 0;
+            int otherTotal = 0;
+            foreach (LicenseFileInfo lf in r.LicenseFiles)
+            {
+                string kind = ((lf.LicenseType ?? "") + " " + (lf.Product ?? "")).ToLowerInvariant();
+                if (kind.IndexOf("сервер") >= 0) serverTotal++;
+                else if (kind.IndexOf("клиент") >= 0) clientTotal += Math.Max(1, lf.UsersNum);
+                else otherTotal++;
+            }
+            int usedClient = -1;
+            if (r.Cluster != null && r.Cluster.Available)
+            {
+                usedClient = 0;
+                foreach (SessionEntry se in r.Cluster.Sessions)
+                {
+                    string sl = ((se.LicenseShort ?? "") + " " + (se.LicenseFullName ?? "") + " " + (se.LicenseType ?? "")).ToLowerInvariant();
+                    if (sl.IndexOf("клиент") >= 0 || se.AppId == "1CV8C" || se.AppId == "Designer" || se.AppId == "WebClient")
+                    {
+                        if (sl.IndexOf("сервер") < 0) usedClient++;
+                    }
+                }
+            }
+            string clientUsage = usedClient < 0
+                ? "нет данных (кластер недоступен)"
+                : usedClient + " из " + clientTotal + ", свободно " + Math.Max(0, clientTotal - usedClient);
+            bool serverRunning = false;
+            foreach (ProcessInfo pi in r.Processes)
+            {
+                if (string.Equals(pi.Name, "rphost", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(pi.Name, "rmngr", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(pi.Name, "ragent", StringComparison.OrdinalIgnoreCase)) { serverRunning = true; break; }
+            }
             string seats = seatUnlimited ? "∞" : (seatSum > 0 ? seatSum.ToString() : "нет данных");
             int usersSum = 0;
             foreach (LicenseFileInfo lf in r.LicenseFiles) usersSum += lf.UsersNum;
             info.Add(new KeyValuePair<string, string>("Лицензий всего",
-                "Лицензий: " + r.LicenseFiles.Count + " (1 файл *.lic = 1 лицензия) · пользователей: " + usersSum + " · мест в аппаратных ключах: " + seats));
+                "Лицензий: " + r.LicenseFiles.Count + " (клиентских мест: " + clientTotal + ", серверных: " + serverTotal + (otherTotal > 0 ? ", прочих: " + otherTotal : "") + ") · пользователей: " + usersSum));
+            info.Add(new KeyValuePair<string, string>("Занято / свободно (клиентские)", clientUsage));
+            info.Add(new KeyValuePair<string, string>("Серверная лицензия", (serverTotal > 0 ? "есть (" + serverTotal + ")" : "не найдена") + (serverRunning ? " · сервер 1С запущен" : " · сервер 1С не запущен")));
+            info.Add(new KeyValuePair<string, string>("Места в аппаратных ключах", seats));
             info.Add(new KeyValuePair<string, string>("Каталоги поиска",
                 r.LicenseStorages.Count == 0 ? "стандартные каталоги отсутствуют" : string.Join("; ", r.LicenseStorages.ToArray())));
             info.Add(new KeyValuePair<string, string>("Отпечаток ПК",

@@ -95,11 +95,37 @@ namespace OneCLicenseInspector.Ui
             _cKeys.Hint = r.Sentinel.Keys.Count == 0 ? "ключей не видно" : "Sentinel LDK";
             _cKeys.Invalidate();
 
-            int total = r.TotalSeats();
-            int free = r.TotalFreeSeats();
-            _cSeats.Value = total > 0 ? (free + " из " + total) : "—";
-            _cSeats.Hint = total > 0 ? "занято " + r.TotalBusySeats() : "нет данных";
-            _cSeats.Accent = total > 0 && free == 0 ? Theme.Red : Theme.Green;
+            int clTotal = 0;
+            foreach (LicenseFileInfo lf in r.LicenseFiles)
+            {
+                string kind = ((lf.LicenseType ?? "") + " " + (lf.Product ?? "")).ToLowerInvariant();
+                if (kind.IndexOf("клиент") >= 0 && kind.IndexOf("сервер") < 0) clTotal += Math.Max(1, lf.UsersNum);
+            }
+            int clUsed = -1;
+            if (r.Cluster != null && r.Cluster.Available)
+            {
+                clUsed = 0;
+                foreach (SessionEntry se in r.Cluster.Sessions)
+                {
+                    string sl = ((se.LicenseShort ?? "") + " " + (se.LicenseFullName ?? "") + " " + (se.LicenseType ?? "")).ToLowerInvariant();
+                    if ((sl.IndexOf("клиент") >= 0 || se.AppId == "1CV8C" || se.AppId == "Designer" || se.AppId == "WebClient") && sl.IndexOf("сервер") < 0)
+                        clUsed++;
+                }
+            }
+
+            int total = r.TotalSeats();            int free = r.TotalFreeSeats();
+            if (clUsed >= 0 && clTotal > 0)
+            {
+                _cSeats.Value = Math.Max(0, clTotal - clUsed) + " из " + clTotal;
+                _cSeats.Hint = "клиентских свободно (занято " + clUsed + ")";
+                _cSeats.Accent = clTotal - clUsed <= 0 ? Theme.Red : Theme.Green;
+            }
+            else
+            {
+                _cSeats.Value = total > 0 ? (free + " из " + total) : "—";
+                _cSeats.Hint = total > 0 ? "занято " + r.TotalBusySeats() : "нет данных";
+                _cSeats.Accent = total > 0 && free == 0 ? Theme.Red : Theme.Green;
+            }
             _cSeats.Invalidate();
 
             _cFiles.Value = r.LicenseFiles.Count.ToString();

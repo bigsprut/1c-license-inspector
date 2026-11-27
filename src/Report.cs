@@ -175,11 +175,37 @@ namespace OneCLicenseInspector
             if (r.LicenseStorages.Count > 0)
             {
                 b.AppendLine("<p class=\"muted\">Каталоги поиска: " + H(string.Join("; ", r.LicenseStorages.ToArray())) + "</p>");
+            }
             int seatSumR = 0; bool seatUnlimR = false;
             foreach (SentinelFeature f in r.Sentinel.Features) { if (f.IsUnlimited) seatUnlimR = true; else seatSumR += f.LimitNum > 0 ? f.LimitNum : 0; }
             int usersSumR = 0; foreach (LicenseFileInfo lf in r.LicenseFiles) usersSumR += lf.UsersNum;
-            Row(b, "Лицензий всего", "Лицензий: " + r.LicenseFiles.Count + " (1 файл *.lic = 1 лицензия) · пользователей: " + usersSumR + " · мест в аппаратных ключах: " + (seatUnlimR ? "∞" : (seatSumR > 0 ? seatSumR.ToString() : "нет данных")));
+            int clientTotalR = 0, serverTotalR = 0, otherTotalR = 0;
+            foreach (LicenseFileInfo lf in r.LicenseFiles)
+            {
+                string kind = ((lf.LicenseType ?? "") + " " + (lf.Product ?? "")).ToLowerInvariant();
+                if (kind.IndexOf("сервер") >= 0) serverTotalR++;
+                else if (kind.IndexOf("клиент") >= 0) clientTotalR += Math.Max(1, lf.UsersNum);
+                else otherTotalR++;
             }
+            int usedClientR = -1;
+            if (r.Cluster != null && r.Cluster.Available)
+            {
+                usedClientR = 0;
+                foreach (SessionEntry se in r.Cluster.Sessions)
+                {
+                    string sl = ((se.LicenseShort ?? "") + " " + (se.LicenseFullName ?? "") + " " + (se.LicenseType ?? "")).ToLowerInvariant();
+                    if ((sl.IndexOf("клиент") >= 0 || se.AppId == "1CV8C" || se.AppId == "Designer" || se.AppId == "WebClient") && sl.IndexOf("сервер") < 0)
+                        usedClientR++;
+                }
+            }
+            Row(b, "Лицензий всего", "Лицензий: " + r.LicenseFiles.Count +
+                " (клиентских мест: " + clientTotalR + ", серверных: " + serverTotalR +
+                (otherTotalR > 0 ? ", прочих: " + otherTotalR : "") + ") · пользователей: " + usersSumR);
+            Row(b, "Занято / свободно (клиентские)", usedClientR < 0
+                ? "нет данных: кластер недоступен (нужны агент 8.3 и ras)"
+                : usedClientR + " из " + clientTotalR + ", свободно " + Math.Max(0, clientTotalR - usedClientR));
+            Row(b, "Серверная лицензия", serverTotalR > 0 ? "есть (" + serverTotalR + ")" : "не найдена");
+            Row(b, "Места в аппаратных ключах", seatUnlimR ? "∞" : (seatSumR > 0 ? seatSumR.ToString() : "нет данных"));
             if (r.LicenseFiles.Count == 0)
             {
                 b.AppendLine("<p class=\"muted\">Файлы *.lic не обнаружены.</p>");
