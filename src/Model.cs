@@ -326,6 +326,8 @@ namespace OneCLicenseInspector
         public bool Available;
         public string Endpoint = "localhost:1545";
         public string RacPath = "";
+        public string RasPath = "";
+        public bool RasStartedByUs;
         public string Error = "";
         public string Note = "";
         public List<ClusterEntry> Clusters = new List<ClusterEntry>();

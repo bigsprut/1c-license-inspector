@@ -127,11 +127,28 @@ namespace OneCLicenseInspector
             bool forced = !string.IsNullOrEmpty(Program.RacOverride);
             if (!forced && !IsOpen(endpoint, port))
             {
+                // Пытаемся сами поднять ras.exe, если платформа 8.3 локальная.
+                string ras = FindRas(r);
+                if (ras.Length > 0 && IsLocalEndpoint(endpoint) && agents.IndexOf("8.3", StringComparison.Ordinal) >= 0)
+                {
+                    if (TryStartRas(ras, port))
+                    {
+                        c.RasStartedByUs = true;
+                        c.RasPath = ras;
+                        r.AddLog(LogLevel.Info, "Кластер", "Запущен ras: " + ras + " --port=" + port);
+                    }
+                }
+            }
+
+            if (!forced && !IsOpen(endpoint, port))
+            {
                 c.Available = false;
                 c.Error = "сервер администрирования не отвечает на " + endpoint;
                 c.Note = "Служба «1С:Предприятие. Сервер администрирования» (ras) не запущена или порт другой. " +
                          "Запускается как ras.exe --port=1545 или службой Windows." +
-                         (agents.IndexOf("8.2", StringComparison.Ordinal) >= 0
+                         (agents.IndexOf("8.3", StringComparison.Ordinal) >= 0
+                             ? " Агент 8.3 работает, но ras не поднялся: запустите ras.exe --port=1545 вручную (нужны права администратора)."
+                             : agents.IndexOf("8.2", StringComparison.Ordinal) >= 0
                              ? " На сервере работает агент 8.2: его сеансы rac не видит — смотрите консоль администрирования 1С 8.2."
                              : "");
                 r.AddLog(LogLevel.Info, "Кластер", c.Error);
@@ -208,10 +225,19 @@ namespace OneCLicenseInspector
             r.AddLog(LogLevel.Info, "Кластер", "Сеансов: " + c.Sessions.Count);
         }
 
+        public static string FindRas(ScanResult r)
+        {
+            return FindTool(r, "ras.exe");
+        }
+
         public static string FindRac(ScanResult r)
         {
             if (!string.IsNullOrEmpty(Program.RacOverride) && File.Exists(Program.RacOverride)) return Program.RacOverride;
+            return FindTool(r, "rac.exe");
+        }
 
+        private static string FindTool(ScanResult r, string fileName)
+        {
             string best = "";
             Version bestVer = new Version(0, 0);
             foreach (PlatformInfo p in r.Platforms)
@@ -219,13 +245,13 @@ namespace OneCLicenseInspector
                 if (p.Family.IndexOf("8", StringComparison.Ordinal) < 0) continue;
                 try
                 {
-                    string rac = Path.Combine(p.BinPath, "rac.exe");
-                    if (!File.Exists(rac)) continue;
+                    string exe = Path.Combine(p.BinPath, fileName);
+                    if (!File.Exists(exe)) continue;
                     Version v;
                     if (!Version.TryParse(NormalizeVersion(p.Version), out v)) v = new Version(0, 0);
                     if (best.Length == 0 || v > bestVer)
                     {
-                        best = rac;
+                        best = exe;
                         bestVer = v;
                     }
                 }
@@ -235,8 +261,8 @@ namespace OneCLicenseInspector
 
             string[] probe = new string[]
             {
-                Path.Combine(Paths.ProgramFiles, "1cv8", "rac.exe"),
-                Path.Combine(Paths.ProgramFilesX86, "1cv8", "rac.exe")
+                Path.Combine(Paths.ProgramFiles, "1cv8", fileName),
+                Path.Combine(Paths.ProgramFilesX86, "1cv8", fileName)
             };
             foreach (string p in probe) if (File.Exists(p)) return p;
             return "";
@@ -271,6 +297,33 @@ namespace OneCLicenseInspector
             return host;
         }
 
+        private static bool IsLocalEndpoint(string endpoint)
+        {
+            string host = HostOf(endpoint).ToLowerInvariant();
+            return host == "localhost" || host == "127.0.0.1" || host == "::1" ||
+                   host == Environment.MachineName.ToLowerInvariant();
+        }
+
+        private static bool TryStartRas(string ras, int port)
+        {
+            System.Diagnostics.Process proc = null;
+            try
+            {
+                System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo(ras, "--port=" + port);
+                psi.UseShellExecute = false;
+                psi.CreateNoWindow = true;
+                try { psi.WorkingDirectory = Path.GetDirectoryName(ras); } catch { }
+                proc = System.Diagnostics.Process.Start(psi);
+                for (int i = 0; i < 30; i++)
+                {
+                    System.Threading.Thread.Sleep(300);
+                    if (IsOpen("localhost:" + port, port)) return true;
+                }
+                try { if (proc != null && !proc.HasExited) proc.Kill(); } catch { }
+            }
+            catch { }
+            return false;
+        }
         private static bool IsOpen(string endpoint, int port)
         {
             try
