@@ -143,6 +143,8 @@ namespace OneCLicenseInspector.Ui
         private List<PageBase> _pages = new List<PageBase>();
         private int _current = -1;
         private bool _scanning;
+        private System.Windows.Forms.Timer _clipTimer;
+        private string _lastClip = "";
         public bool AutoScan = true;
 
         private int _initialPage;
@@ -221,6 +223,7 @@ namespace OneCLicenseInspector.Ui
             Shown += delegate
             {
                 Diag.Log("form: shown");
+                StartClipWatch();
                 if (Program.NavTest)
                 {
                     for (int i = 0; i < _factories.Count; i++)
@@ -422,6 +425,37 @@ namespace OneCLicenseInspector.Ui
             }
         }
 
+        private void StartClipWatch()
+        {
+            _clipTimer = new System.Windows.Forms.Timer();
+            _clipTimer.Interval = 1000;
+            _clipTimer.Tick += delegate { CheckClipboard82(); };
+            _clipTimer.Start();
+        }
+
+        private void CheckClipboard82()
+        {
+            if (_result == null) return;
+            try
+            {
+                if (!Clipboard.ContainsText()) return;
+                string text = Clipboard.GetText();
+                if (string.IsNullOrEmpty(text) || text == _lastClip) return;
+                _lastClip = text;
+                string summary;
+                if (!Console82Apply.TryApply(_result, text, out summary)) return;
+                Diag.Log("clipboard 8.2: " + summary);
+                foreach (PageBase page in _pages)
+                {
+                    if (page == null) continue;
+                    try { page.SetSnapshot(_result); page.Bind(_result); }
+                    catch { }
+                }
+                _status.LeftText = "Из консоли 8.2: " + summary;
+                _status.Invalidate();
+            }
+            catch { }
+        }
         private void CopyCurrentPage()
         {
             try

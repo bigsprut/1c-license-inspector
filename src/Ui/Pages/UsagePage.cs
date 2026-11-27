@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -23,6 +24,8 @@ namespace OneCLicenseInspector.Ui
         private TextBox _sessPwd;
         private FlatButton _sessRefresh;
         private FlatButton _sessImport;
+        private FlatButton _sessConsole;
+        private FlatButton _sessGrab;
         private ScanResult _result;
         private List<SessionEntry> _sessionItems = new List<SessionEntry>();
 
@@ -130,6 +133,24 @@ namespace OneCLicenseInspector.Ui
             _sessImport.Margin = new Padding(2, 2, 4, 2);
             _sessImport.Click += delegate { ImportConsole82(); };
             top.Controls.Add(_sessImport);
+
+            _sessConsole = new FlatButton();
+            _sessConsole.Text = "Открыть консоль";
+            _sessConsole.Icon = "key";
+            _sessConsole.Kind = ButtonKind.Ghost;
+            _sessConsole.Size = new Size(150, 30);
+            _sessConsole.Margin = new Padding(2, 2, 4, 2);
+            _sessConsole.Click += delegate { OpenConsole82(); };
+            top.Controls.Add(_sessConsole);
+
+            _sessGrab = new FlatButton();
+            _sessGrab.Text = "Взять из консоли";
+            _sessGrab.Icon = "refresh";
+            _sessGrab.Kind = ButtonKind.Primary;
+            _sessGrab.Size = new Size(170, 30);
+            _sessGrab.Margin = new Padding(2, 2, 4, 2);
+            _sessGrab.Click += delegate { GrabFromConsole(); };
+            top.Controls.Add(_sessGrab);
 
             _sessHint = new Label();
             _sessHint.Dock = DockStyle.Bottom;
@@ -259,6 +280,50 @@ namespace OneCLicenseInspector.Ui
             BindSessions();
         }
 
+        private void GrabFromConsole()
+        {
+            string error;
+            string text = Console82Automation.CopyTable(out error);
+            if (string.IsNullOrEmpty(text))
+            {
+                MessageBox.Show(string.IsNullOrEmpty(error)
+                    ? "Не удалось получить таблицу из консоли."
+                    : "Не удалось получить таблицу: " + error);
+                return;
+            }
+            string summary;
+            if (_result == null || !Console82Apply.TryApply(_result, text, out summary))
+            {
+                MessageBox.Show("В буфере нет таблицы сеансов/процессов 1С 8.2. Щёлкните по таблице в консоли и повторите.");
+                return;
+            }
+            BindSessions();
+            _sessHint.Text = "Взято из консоли 8.2: " + summary;
+        }
+        private void OpenConsole82()
+        {
+            try
+            {
+                string[] probes = new string[]
+                {
+                    Path.Combine(Paths.ProgramFilesX86, "1cv82", "common", "1CV8 Servers.msc"),
+                    Path.Combine(Paths.ProgramFiles, "1cv82", "common", "1CV8 Servers (x86-64).msc"),
+                    Path.Combine(Paths.ProgramFiles, "1cv82", "common", "1CV8 Servers.msc"),
+                    Path.Combine(Paths.ProgramFilesX86, "1cv82", "common", "1CV8 Servers (x86-64).msc")
+                };
+                foreach (string msc in probes)
+                {
+                    if (!File.Exists(msc)) continue;
+                    System.Diagnostics.Process.Start("mmc.exe", "\"" + msc + "\"");
+                    return;
+                }
+                MessageBox.Show("Не найдена оснастка «1CV8 Servers.msc». Откройте её вручную: mmc.exe → Файл → Добавить/удалить оснастку.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Не удалось открыть консоль: " + ex.Message);
+            }
+        }
         private void ImportConsole82()
         {
             string text = "";
@@ -266,124 +331,28 @@ namespace OneCLicenseInspector.Ui
             catch { }
             if (string.IsNullOrEmpty(text))
             {
-                MessageBox.Show("Скопируйте таблицу сеансов в консоли администрирования 1С 8.2 (выделить → Ctrl+C) и нажмите кнопку снова.");
+                MessageBox.Show("Скопируйте таблицу сеансов в консоли администрирования 1С 8.2 (Ctrl+C) — программа подхватит её сама, либо нажмите кнопку ещё раз.");
                 return;
             }
-            if (Console82Import.LooksLikeProcesses(text))
-            {
-                ImportProcesses82(text);
-                return;
-            }
-            List<Console82Import.Row> parsed = Console82Import.Parse(text);
-            if (parsed.Count == 0)
+            string summary;
+            if (_result == null || !Console82Apply.TryApply(_result, text, out summary))
             {
                 MessageBox.Show("В буфере обмена нет таблицы сеансов 1С 8.2.");
                 return;
             }
-            if (_result == null) return;
-            _result.Cluster.Sessions.Clear();
-            List<SessionRow> rows = new List<SessionRow>();
-            foreach (Console82Import.Row pr in parsed)
-            {
-                SessionRow row = new SessionRow();
-                row.User = string.IsNullOrEmpty(pr.User) ? "—" : pr.User;
-                row.Host = pr.Host;
-                row.AppId = pr.App;
-                row.StartedAt = pr.Started;
-                string lkind, lpin; int lused, ltotal;
-                Console82Import.ParseLicense(pr.License, out lkind, out lpin, out lused, out ltotal);
-                row.License = string.IsNullOrEmpty(lkind) ? "—" : lkind;
-                row.Pin = lpin;
-                row.Used = lused >= 0 ? lused.ToString() : "";
-                row.Total = ltotal >= 0 ? ltotal.ToString() : "";
-                row.Seats = "";
-                rows.Add(row);
-
-                SessionEntry se = new SessionEntry();
-                se.SessionId = pr.Session;
-                se.User = pr.User;
-                se.Host = pr.Host;
-                se.AppId = pr.App;
-                se.StartedAt = pr.Started;
-                se.LicenseShort = pr.License;
-                se.Infobase = pr.Infobase;
-                _result.Cluster.Sessions.Add(se);
-            }
-            _result.Cluster.Available = true;
-            _result.Cluster.Error = "";
-            _result.Cluster.Endpoint = "консоль 8.2";
-            string ckind, cpin; int cused, ctotal;
-            foreach (Console82Import.Row pr in parsed)
-            {
-                if (string.IsNullOrEmpty(pr.License)) continue;
-                Console82Import.ParseLicense(pr.License, out ckind, out cpin, out cused, out ctotal);
-                _result.Cluster.ImportedClientPin = cpin;
-                _result.Cluster.ImportedClientUsed = cused;
-                _result.Cluster.ImportedClientTotal = ctotal;
-                break;
-            }
-            _sessionItems = _result.Cluster.Sessions;
-
-            _sessions.DataSource = null;
-            _sessions.DataSource = rows;
-            _sessHint.Text = "Импорт из консоли 8.2: " + Console82Import.Summary(parsed);
-            if (rows.Count > 0) _sessions.Rows[0].Selected = true;
-            ShowSessionDetails();
+            BindSessions();
+            _sessHint.Text = "Импорт из консоли 8.2: " + summary;
         }
         private void ImportProcesses82(string text)
         {
-            List<Console82Import.ProcRow> parsed = Console82Import.ParseProcesses(text);
-            if (parsed.Count == 0)
+            string summary;
+            if (_result == null || !Console82Apply.TryApply(_result, text, out summary))
             {
                 MessageBox.Show("В буфере нет таблицы рабочих процессов 1С 8.2.");
                 return;
             }
-            if (_result == null) return;
-            _result.Cluster.Sessions.Clear();
-            List<SessionRow> rows = new List<SessionRow>();
-            foreach (Console82Import.ProcRow pr in parsed)
-            {
-                SessionRow row = new SessionRow();
-                row.User = pr.Computer;
-                row.Host = ":" + pr.Port;
-                row.AppId = pr.Usage;
-                row.StartedAt = pr.Enabled + " / " + pr.Active;
-                string lkind, lpin; int lused, ltotal;
-                Console82Import.ParseLicense(pr.License, out lkind, out lpin, out lused, out ltotal);
-                row.License = string.IsNullOrEmpty(lkind) ? "—" : lkind;
-                row.Pin = lpin;
-                row.Used = lused >= 0 ? lused.ToString() : "";
-                row.Total = ltotal >= 0 ? ltotal.ToString() : "";
-                row.Seats = pr.Pid;
-                rows.Add(row);
-
-                SessionEntry se = new SessionEntry();
-                se.User = pr.Computer;
-                se.Host = ":" + pr.Port;
-                se.AppId = pr.Usage;
-                se.LicenseShort = pr.License;
-                _result.Cluster.Sessions.Add(se);
-            }
-            _result.Cluster.Available = true;
-            _result.Cluster.Error = "";
-            _result.Cluster.Endpoint = "консоль 8.2 (процессы)";
-            string skind, spin; int sused, stotal;
-            foreach (Console82Import.ProcRow pr in parsed)
-            {
-                if (string.IsNullOrEmpty(pr.License)) continue;
-                Console82Import.ParseLicense(pr.License, out skind, out spin, out sused, out stotal);
-                _result.Cluster.ImportedServerPin = spin;
-                _result.Cluster.ImportedServerUsed = sused;
-                _result.Cluster.ImportedServerTotal = stotal;
-                break;
-            }
-            _sessionItems = _result.Cluster.Sessions;
-
-            _sessions.DataSource = null;
-            _sessions.DataSource = rows;
-            _sessHint.Text = "Импорт процессов 8.2: " + Console82Import.ProcessSummary(parsed);
-            if (rows.Count > 0) _sessions.Rows[0].Selected = true;
-            ShowSessionDetails();
+            BindSessions();
+            _sessHint.Text = "Импорт процессов 8.2: " + summary;
         }
         private void BindSessions()
         {
@@ -399,7 +368,12 @@ namespace OneCLicenseInspector.Ui
                 row.Host = s.Host;
                 row.AppId = s.AppId;
                 row.StartedAt = ShortDate(s.StartedAt);
-                row.License = LicenseText(s);
+                string licKind, licPin; int licUsed, licTotal;
+                Console82Import.ParseLicense(s.LicenseShort, out licKind, out licPin, out licUsed, out licTotal);
+                row.License = licKind.Length > 0 ? licKind : LicenseText(s);
+                row.Pin = licPin;
+                row.Used = licUsed >= 0 ? licUsed.ToString() : "";
+                row.Total = licTotal >= 0 ? licTotal.ToString() : "";
                 row.Seats = string.IsNullOrEmpty(s.MaxUsersAll) ? s.MaxUsersCur : (s.MaxUsersCur + " / " + s.MaxUsersAll);
                 rows.Add(row);
             }
