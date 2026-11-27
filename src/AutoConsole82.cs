@@ -29,9 +29,6 @@ namespace OneCLicenseInspector
                 if (r.Cluster != null && r.Cluster.Available && r.Cluster.Sessions.Count > 0)
                     return false;
 
-                string helperPath; string helperErr;
-                helperPath = Mmc20Reader.EnsureHelper(out helperErr);
-                r.AddLog(LogLevel.Info, "Консоль 8.2", "помощник: " + (helperPath ?? ("нет (" + helperErr + ")")));
                 string msc = FindMsc();
                 if (string.IsNullOrEmpty(msc))
                 {
@@ -39,7 +36,7 @@ namespace OneCLicenseInspector
                     return false;
                 }
 
-                r.AddLog(LogLevel.Info, "Консоль 8.2", "оснастка: " + msc);
+                r.AddLog(LogLevel.Info, "Консоль 8.2", "оснастка: " + msc + " (" + (Environment.Is64BitProcess ? "x64" : "x86") + ")");
 
                 string errProc, errSess;
                 string procTsv = Mmc20Reader.ReadTable(msc, "Рабочие процессы", out errProc);
