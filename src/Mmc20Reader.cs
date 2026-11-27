@@ -31,7 +31,7 @@ namespace OneCLicenseInspector
                 object scope = Prop(doc, "ScopeNamespace");
                 object root = Prop(doc, "RootNode");
 
-                object found = Find(scope, root, nodeName, 0, 7);
+                object found = Find(scope, root, nodeName, "Информационные базы", Convert.ToString(Prop(root, "Name")), 0, 7);
                 if (found == null)
                 {
                     error = "в дереве не найден узел «" + nodeName + "»";
@@ -92,11 +92,11 @@ namespace OneCLicenseInspector
             }
         }
 
-        private static object Find(object scope, object parent, string needle, int depth, int maxDepth)
+        private static object Find(object scope, object parent, string needle, string exclude, string path, int depth, int maxDepth)
         {
             if (depth > maxDepth) return null;
             try { Call(scope, "Expand", parent); } catch { }
-            Thread.Sleep(150);
+            Thread.Sleep(120);
 
             object child = null;
             try { child = Call(scope, "GetChild", parent); } catch { child = null; }
@@ -104,10 +104,17 @@ namespace OneCLicenseInspector
             {
                 string name = "";
                 try { name = Convert.ToString(Prop(child, "Name")); } catch { }
-                if (!string.IsNullOrEmpty(name) && name.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0)
-                    return child;
+                string full = path + "\\" + name;
 
-                object deep = Find(scope, child, needle, depth + 1, maxDepth);
+                if (!string.IsNullOrEmpty(name) &&
+                    name.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0 &&
+                    (string.IsNullOrEmpty(exclude) || full.IndexOf(exclude, StringComparison.OrdinalIgnoreCase) < 0))
+                {
+                    Diag.Log("mmc20: узел " + full);
+                    return child;
+                }
+
+                object deep = Find(scope, child, needle, exclude, full, depth + 1, maxDepth);
                 if (deep != null) return deep;
 
                 object next = null;
