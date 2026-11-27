@@ -11,6 +11,7 @@ namespace OneCLicenseInspector.Ui
         private KeyValueList _info;
         private TextBox _hex;
         private TextBox _ring;
+        private int _infoRow;
         private List<LicenseFileInfo> _items = new List<LicenseFileInfo>();
         private Panel _hexCard;
 
@@ -19,7 +20,7 @@ namespace OneCLicenseInspector.Ui
             AddHeader("Программные лицензии", "Файлы лицензий 1С (*.lic): где лежат, когда активированы, в каком состоянии");
 
             _info = new KeyValueList();
-            AddRow(WithTitle("Каталоги лицензий и привязка", Card(_info, new Padding(0))), 128);
+            _infoRow = AddRow(WithTitle("Каталоги лицензий и привязка", Card(_info, new Padding(0))), 128);
             AddSpacer(6);
 
             _grid = MakeGrid();
@@ -40,7 +41,7 @@ namespace OneCLicenseInspector.Ui
             _hex.BorderStyle = BorderStyle.None;
             _hex.BackColor = Color.FromArgb(250, 251, 252);
             _hex.ForeColor = Theme.InkSoft;
-            _hex.Font = new Font(Theme.MonoFamily, 8.5f);
+            _hex.Font = Theme.MonoFont(8.5f);
             _hex.Dock = DockStyle.Fill;
             _hexCard = WithTitle("Первые байты файла (диагностика формата)", Card(_hex, new Padding(10)));
             AddRow(_hexCard, 140);
@@ -53,7 +54,7 @@ namespace OneCLicenseInspector.Ui
             _ring.BorderStyle = BorderStyle.None;
             _ring.BackColor = Color.FromArgb(250, 251, 252);
             _ring.ForeColor = Theme.InkSoft;
-            _ring.Font = new Font(Theme.MonoFamily, 8.5f);
+            _ring.Font = Theme.MonoFont(8.5f);
             _ring.Dock = DockStyle.Fill;
             AddRow(WithTitle("Вывод утилиты лицензирования ring", Card(_ring, new Padding(10))), 126);
         }
@@ -103,6 +104,8 @@ namespace OneCLicenseInspector.Ui
 
 
             _info.Set(info);
+            int w = Root.ClientSize.Width > 300 ? Root.ClientSize.Width - 12 : 900;
+            SetRowHeight(_infoRow, Math.Max(110, _info.Measure(w) + 34));
 
             if (!string.IsNullOrEmpty(r.LicenseRingOutput))
             {

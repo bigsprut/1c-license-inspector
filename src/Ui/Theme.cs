@@ -74,8 +74,18 @@ namespace OneCLicenseInspector.Ui
 
         public static Font Font(float size, FontStyle style)
         {
-            try { return new Font(UiFamily, size, style, GraphicsUnit.Point); }
-            catch { return new Font(FontFamily.GenericSansSerif, size, style); }
+            // Размеры заданы в «пунктах макета» 96 DPI и переводятся в пиксели, чтобы шрифты
+            // не увеличивались на мониторах с масштабированием и не рвали фиксированную вёрстку.
+            float px = size * 96f / 72f;
+            try { return new Font(UiFamily, px, style, GraphicsUnit.Pixel); }
+            catch { return new Font(FontFamily.GenericSansSerif, px, style, GraphicsUnit.Pixel); }
+        }
+
+        public static Font MonoFont(float size)
+        {
+            float px = size * 96f / 72f;
+            try { return new Font(MonoFamily, px, FontStyle.Regular, GraphicsUnit.Pixel); }
+            catch { return new Font(FontFamily.GenericMonospace, px, FontStyle.Regular, GraphicsUnit.Pixel); }
         }
 
         public static Font Body { get { return Font(9f, FontStyle.Regular); } }
@@ -205,8 +215,18 @@ namespace OneCLicenseInspector.Ui
             g.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(70, 88, 106);
             g.ColumnHeadersDefaultCellStyle.Font = SmallBold;
             g.ColumnHeadersDefaultCellStyle.Padding = new Padding(6, 0, 6, 0);
-            g.ColumnHeadersHeight = Math.Max(28, (int)(TextRenderer.MeasureText("Ag", SmallBold).Height * 1.7));
             g.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            // ColumnHeadersHeight нельзя задавать до создания окна: на Server 2003/2008 это
+            // бросает Win32Exception "Error creating window handle" и приложение не стартует.
+            g.HandleCreated += delegate
+            {
+                try
+                {
+                    int headerHeight = Math.Max(28, (int)(TextRenderer.MeasureText("Ag", SmallBold).Height * 1.7));
+                    if (g.ColumnHeadersHeight != headerHeight) g.ColumnHeadersHeight = headerHeight;
+                }
+                catch { }
+            };
             g.DefaultCellStyle.BackColor = Paper;
             g.DefaultCellStyle.ForeColor = InkSoft;
             g.DefaultCellStyle.SelectionBackColor = AccentSoft;

@@ -72,8 +72,9 @@ namespace OneCLicenseInspector.Ui
             _host.Controls.Add(BuildSessionsPanel());
             AddRow(Card(_host, new Padding(1)), 478);
 
-            _tabs.SelectedIndexChanged += delegate { ShowTab(); };
-            ShowTab();
+            _tabs.SelectedIndexChanged += delegate { if (IsHandleCreated) ShowTab(); };
+            HandleCreated += delegate { ShowTab(); };
+            if (IsHandleCreated) ShowTab();
         }
 
         private Panel BuildSessionsPanel()
@@ -135,7 +136,7 @@ namespace OneCLicenseInspector.Ui
             _sessDetails.BorderStyle = BorderStyle.None;
             _sessDetails.BackColor = Color.FromArgb(250, 251, 252);
             _sessDetails.ForeColor = Theme.InkSoft;
-            _sessDetails.Font = new Font(Theme.MonoFamily, 8.5f);
+            _sessDetails.Font = Theme.MonoFont(8.5f);
             _sessDetails.Dock = DockStyle.Bottom;
             _sessDetails.Height = 96;
 
@@ -180,6 +181,7 @@ namespace OneCLicenseInspector.Ui
 
         private void ShowTab()
         {
+            if (!IsHandleCreated) return;
             bool sessions = _tabs.SelectedIndex == 3;
             _sessPanel.Visible = sessions;
             if (sessions) _sessPanel.BringToFront();

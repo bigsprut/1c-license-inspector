@@ -109,7 +109,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.1.0";
+        public const string Version = "1.1.2";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -117,6 +117,17 @@ namespace OneCLicenseInspector
         public static string ClusterUser = "";
         public static string ClusterPwd = "";
         public static int InitialUsageTab = 0;
+        public static int OnlyPage = -1;
+        public static bool NoPages = false;
+        public static int BareLevel = 4;
+        public static bool NoIcon;
+        public static bool NoKeyPreview;
+        public static bool NoMinSize;
+        public static bool NoCenter;
+        public static bool NoFont;
+        public static bool PlainForm;
+        public static bool NavTest;
+        public static bool DebugLog;
 
         [STAThread]
         private static int Main(string[] args)
@@ -134,8 +145,26 @@ namespace OneCLicenseInspector
                 ClusterUser = Arg(args, "/clusteruser");
                 ClusterPwd = Arg(args, "/clusterpwd");
                 int usageTab = 0;
-                int.TryParse(Arg(args, "/usagetab"), out usageTab);
+                string usageTabText = Arg(args, "/usagetab");
+                if (!string.IsNullOrEmpty(usageTabText)) int.TryParse(usageTabText, out usageTab);
                 InitialUsageTab = usageTab;
+                int onlyPage = -1;
+                string onlyText = Arg(args, "/only");
+                if (!string.IsNullOrEmpty(onlyText)) int.TryParse(onlyText, out onlyPage);
+                OnlyPage = onlyPage;
+                NoPages = Has(args, "/nopages");
+                int bare = 4;
+                string bareText = Arg(args, "/bare");
+                if (!string.IsNullOrEmpty(bareText)) int.TryParse(bareText, out bare);
+                BareLevel = bare;
+                NoIcon = Has(args, "/noicon");
+                NoKeyPreview = Has(args, "/nokeyprev");
+                NoMinSize = Has(args, "/nominsize");
+                NoCenter = Has(args, "/nocenterscreen");
+                NoFont = Has(args, "/nofont");
+                PlainForm = Has(args, "/plainform");
+                NavTest = Has(args, "/navtest");
+                DebugLog = Has(args, "/debug");
                 Boot("text rendering ok");
 
                 string report = Arg(args, "/report");
@@ -216,7 +245,23 @@ namespace OneCLicenseInspector
                     }
                     return 0;
                 }
-                Application.Run(new Ui.MainForm(page));
+                Diag.Reset();
+                if (PlainForm)
+                {
+                    System.Windows.Forms.Form plain = new System.Windows.Forms.Form();
+                    plain.Text = "plain";
+                    plain.ClientSize = new System.Drawing.Size(800, 600);
+                    plain.Shown += delegate { Diag.Log("plain: shown"); plain.Close(); };
+                    Diag.Log("plain: created");
+                    System.Windows.Forms.Application.Run(plain);
+                    Diag.Log("plain: closed");
+                    return 0;
+                }
+                Diag.Log("main: creating form");
+                Ui.MainForm form = new Ui.MainForm(page);
+                Diag.Log("main: form created");
+                Application.Run(form);
+                Diag.Log("main: form closed");
                 Boot("form closed");
                 return 0;
             }
@@ -236,6 +281,7 @@ namespace OneCLicenseInspector
 
         public static void Boot(string text)
         {
+            if (!DebugLog) return;
             string[] paths = new string[]
             {
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "boot.log"),

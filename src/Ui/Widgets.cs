@@ -24,6 +24,25 @@ namespace OneCLicenseInspector.Ui
         }
     }
 
+    /// <summary>Измерение текста без создания оконных handle (важно для Server 2003/2008).</summary>
+    internal static class TextMeasure
+    {
+        private static Bitmap _bitmap;
+        private static Graphics _graphics;
+
+        public static Graphics G
+        {
+            get
+            {
+                if (_graphics == null)
+                {
+                    _bitmap = new Bitmap(1, 1);
+                    _graphics = Graphics.FromImage(_bitmap);
+                }
+                return _graphics;
+            }
+        }
+    }
     internal enum ButtonKind { Primary, Secondary, Ghost }
 
     internal class FlatButton : Control
@@ -239,6 +258,26 @@ namespace OneCLicenseInspector.Ui
         {
             Items = items ?? new List<KeyValuePair<string, string>>();
             Invalidate();
+        }
+
+        public int Measure(int width)
+        {
+            if (width < 200) width = 800;
+            Graphics g = TextMeasure.G;
+            int labelW = Dpi.S(g, 186);
+            int lineH = (int)Theme.Body.GetHeight(g) + Dpi.S(g, 5);
+            int valueW = Math.Max(60, width - labelW - Dpi.S(g, 14));
+            int total = Dpi.S(g, 16);
+            using (Font f = Theme.Body)
+            {
+                foreach (KeyValuePair<string, string> kv in Items)
+                {
+                    string value = kv.Value ?? "";
+                    Size vs = TextRenderer.MeasureText(g, value, f, new Size(valueW, int.MaxValue), TextFormatFlags.WordBreak);
+                    total += Math.Max(lineH, vs.Height + Dpi.S(g, 2)) + Dpi.S(g, 1);
+                }
+            }
+            return total;
         }
 
         protected override void OnPaint(PaintEventArgs e)

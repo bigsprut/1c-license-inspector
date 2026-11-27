@@ -15,6 +15,7 @@ namespace OneCLicenseInspector.Ui
         private WarnPanel _warn;
         private KeyValueList _facts;
         private int _colsRow;
+        private int _factsRow;
         private TableLayoutPanel _cols;
 
         public OverviewPage()
@@ -63,7 +64,7 @@ namespace OneCLicenseInspector.Ui
             _facts = new KeyValueList();
             _facts.Dock = DockStyle.Fill;
             Panel factCard = Card(_facts, new Padding(0));
-            AddRow(WithTitle("Краткая сводка", factCard), 186);
+            _factsRow = AddRow(WithTitle("Краткая сводка", factCard), 186);
         }
 
         private Panel WithTitle(string title, Control body)
@@ -138,15 +139,14 @@ namespace OneCLicenseInspector.Ui
                     : "Файлы программных лицензий не найдены ни в одном стандартном каталоге."));
 
             _status.Items = items;
-            int h = _status.Measure(_cols.Width > 0 ? (int)(_cols.Width * 0.57) : 560);
-            _cols.Height = Math.Max(220, h);
-            if (_colsRow >= 0 && _colsRow < Root.RowStyles.Count)
-            {
-                Root.RowStyles[_colsRow].Height = _cols.Height;
-            }
-
             _warn.Items = r.Warnings;
             _warn.Invalidate();
+
+            int totalW = Root.ClientSize.Width > 300 ? Root.ClientSize.Width : 900;
+            int leftW = (int)((totalW - 10) * 0.55);
+            int rightW = (int)((totalW - 10) * 0.45);
+            int h = Math.Max(_status.Measure(leftW), _warn.Measure(rightW)) + 34;
+            SetRowHeight(_colsRow, Math.Max(240, h));
             _cols.PerformLayout();
             Root.PerformLayout();
 

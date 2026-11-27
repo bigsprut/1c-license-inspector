@@ -32,13 +32,14 @@ namespace OneCLicenseInspector.Ui
             _row = 0;
         }
 
-        public void ScrollTop()
-        {
-            try { AutoScrollPosition = new Point(0, 0); } catch { }
-        }
-
         public virtual void Bind(ScanResult r) { }
         public virtual void Activated() { }
+
+        public void ScrollTop()
+        {
+            try { AutoScrollPosition = new Point(0, 0); }
+            catch { }
+        }
 
         protected override void OnResize(EventArgs e)
         {
@@ -51,8 +52,9 @@ namespace OneCLicenseInspector.Ui
             catch { }
         }
 
-        protected void AddRow(Control c, int height)
+        protected int AddRow(Control c, int height)
         {
+            int row = _row;
             _totalHeight += height;
             Root.Height = _totalHeight;
             Root.RowCount = _row + 1;
@@ -61,6 +63,21 @@ namespace OneCLicenseInspector.Ui
             c.Margin = new Padding(0);
             Root.Controls.Add(c, 0, _row);
             _row++;
+            return row;
+        }
+
+        protected void SetRowHeight(int row, int height)
+        {
+            try
+            {
+                if (row < 0 || row >= Root.RowStyles.Count) return;
+                int old = (int)Root.RowStyles[row].Height;
+                if (old == height) return;
+                Root.RowStyles[row].Height = height;
+                Root.Height += (height - old);
+                Root.PerformLayout();
+            }
+            catch { }
         }
 
         protected void AddAutoRow(Control c)
@@ -127,11 +144,6 @@ namespace OneCLicenseInspector.Ui
             g.Columns.Add(c);
             return c;
         }
-
-        protected static string T(string s)
-        {
-            return s ?? "";
-        }
     }
 
     internal class StatusItem
@@ -161,19 +173,20 @@ namespace OneCLicenseInspector.Ui
 
         public int Measure(int width)
         {
-            using (Graphics g = CreateGraphics())
+            if (width < 200) width = 600;
+            Graphics g = TextMeasure.G;
+            int w = width - Dpi.S(g, 62);
+            int lineH = (int)Theme.Body.GetHeight(g);
+            int h = Dpi.S(g, 20);
             using (Font f = Theme.Body)
             {
-                int w = width - Dpi.S(g, 58);
-                int h = Dpi.S(g, 10);
-                int lineH = (int)f.GetHeight(g);
                 foreach (StatusItem it in Items)
                 {
                     int th = TextRenderer.MeasureText(g, it.Text, f, new Size(w, int.MaxValue), TextFormatFlags.WordBreak).Height;
                     h += Math.Max(Dpi.S(g, 34), th + lineH + Dpi.S(g, 20)) + Dpi.S(g, 8);
                 }
-                return h + Dpi.S(g, 8);
             }
+            return h + Dpi.S(g, 16);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -223,19 +236,20 @@ namespace OneCLicenseInspector.Ui
 
         public int Measure(int width)
         {
-            using (Graphics g = CreateGraphics())
+            if (width < 200) width = 500;
+            Graphics g = TextMeasure.G;
+            int w = width - Dpi.S(g, 46);
+            int lineH = (int)Theme.Body.GetHeight(g);
+            int h = Dpi.S(g, 8);
             using (Font f = Theme.Body)
             {
-                int w = width - Dpi.S(g, 46);
-                int h = Dpi.S(g, 8);
-                int lineH = (int)f.GetHeight(g);
                 foreach (Warning it in Items)
                 {
                     int th = TextRenderer.MeasureText(g, it.Text, f, new Size(w, int.MaxValue), TextFormatFlags.WordBreak).Height;
-                    h += th + lineH + Dpi.S(g, 26);
+                    h += th + lineH + Dpi.S(g, 34) + Dpi.S(g, 8);
                 }
-                return Math.Max(h + Dpi.S(g, 8), Dpi.S(g, 90));
             }
+            return Math.Max(h + Dpi.S(g, 8), Dpi.S(g, 90));
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -265,7 +279,7 @@ namespace OneCLicenseInspector.Ui
                 {
                     Color accent = it.Level == LogLevel.Error ? Theme.Red : (it.Level == LogLevel.Warn ? Theme.Accent : Theme.Blue);
                     int th = TextRenderer.MeasureText(g, it.Text, f, new Size(w, int.MaxValue), TextFormatFlags.WordBreak).Height;
-                    int h = th + lineH + Dpi.S(g, 26);
+                    int h = th + lineH + Dpi.S(g, 34);
                     Rectangle card = new Rectangle(0, y, Width - 1, h);
                     Theme.FillRound(g, card, Dpi.S(g, 8), Theme.Paper);
                     Theme.DrawRound(g, card, Dpi.S(g, 8), Theme.Line, 1f);

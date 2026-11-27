@@ -16,13 +16,15 @@ namespace OneCLicenseInspector.Ui
         private ScanResult _result;
         private FlatButton _btnMonitor;
         private FlatButton _btnImport;
+        private int _lmRow;
+        private int _haspRow;
 
         public HardwarePage()
         {
             AddHeader("Аппаратные ключи", "Ключи HASP HL / Sentinel HL и устаревший менеджер HASP4 Net для 1С 7.7 и 8.2");
 
             _lm = new KeyValueList();
-            AddRow(WithTitle("Менеджер лицензий Sentinel LDK", Card(_lm, new Padding(0))), 124);
+            _lmRow = AddRow(WithTitle("Менеджер лицензий Sentinel LDK", Card(_lm, new Padding(0))), 124);
             AddSpacer(6);
 
             _keys = MakeGrid();
@@ -49,7 +51,7 @@ namespace OneCLicenseInspector.Ui
             AddSpacer(6);
 
             _hasp4 = new KeyValueList();
-            AddRow(WithTitle("Устаревший менеджер HASP4 Net", Card(_hasp4, new Padding(0))), 196);
+            _haspRow = AddRow(WithTitle("Устаревший менеджер HASP4 Net", Card(_hasp4, new Padding(0))), 196);
             AddSpacer(6);
 
             FlowLayoutPanel tools = new FlowLayoutPanel();
@@ -180,6 +182,13 @@ namespace OneCLicenseInspector.Ui
                 _btnMonitor.Enabled = !string.IsNullOrEmpty(r.Hasp4.ToolPath) &&
                                       string.Equals(r.Hasp4.ToolKind, "monitor", StringComparison.OrdinalIgnoreCase);
             }
+        }
+
+        private void ResizeLists()
+        {
+            int w = Root.ClientSize.Width > 300 ? Root.ClientSize.Width - 12 : 900;
+            SetRowHeight(_lmRow, Math.Max(110, _lm.Measure(w) + 34));
+            SetRowHeight(_haspRow, Math.Max(150, _hasp4.Measure(w) + 34));
         }
 
         private void OpenMonitor()

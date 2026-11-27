@@ -147,51 +147,134 @@ namespace OneCLicenseInspector.Ui
             SuspendLayout();
             Text = "Инспектор лицензий 1С";
             BackColor = Theme.Canvas;
-            Font = Theme.Body;
+            if (!Program.NoFont) Font = Theme.Body;
             AutoScaleMode = AutoScaleMode.None;
-            StartPosition = FormStartPosition.CenterScreen;
+            if (!Program.NoCenter) StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(1220, 780);
-            MinimumSize = new Size(1020, 660);
-            KeyPreview = true;
-            try
+            if (!Program.NoMinSize) MinimumSize = new Size(1020, 660);
+            if (!Program.NoKeyPreview) KeyPreview = true;
+            if (!Program.NoIcon)
             {
-                Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+                try
+                {
+                    Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+                }
+                catch { }
             }
-            catch { }
+
+            if (Program.BareLevel == 0)
+            {
+                ResumeLayout(true);
+                return;
+            }
 
             _content = new Panel();
-            _content.Dock = DockStyle.Fill;
-            _content.BackColor = Theme.Canvas;
-            _content.Padding = new Padding(0);
-            Controls.Add(_content);
+            if (Program.BareLevel >= 4)
+            {
+                _content.Dock = DockStyle.Fill;
+                _content.BackColor = Theme.Canvas;
+                _content.Padding = new Padding(0);
+                Controls.Add(_content);
+            }
 
             _status = new StatusBarEx();
-            _status.Dock = DockStyle.Bottom;
-            Controls.Add(_status);
+            if (Program.BareLevel >= 3)
+            {
+                _status.Dock = DockStyle.Bottom;
+                Controls.Add(_status);
+            }
 
             _nav = new BufferedPanel();
-            _nav.Dock = DockStyle.Left;
-            _nav.Width = 236;
-            _nav.BackColor = Color.White;
-            _nav.Padding = new Padding(8, 12, 8, 8);
-            _nav.Paint += NavPaint;
-            Controls.Add(_nav);
+            if (Program.BareLevel >= 2)
+            {
+                _nav.Dock = DockStyle.Left;
+                _nav.Width = 236;
+                _nav.BackColor = Color.White;
+                _nav.Padding = new Padding(8, 12, 8, 8);
+                _nav.Paint += NavPaint;
+                Controls.Add(_nav);
+            }
 
             _header = new HeaderPanel();
-            _header.Dock = DockStyle.Top;
-            _header.Subtitle = "Аудит лицензий на этом компьютере";
-            _header.RefreshButton.Click += delegate { StartScan(); };
-            _header.Export.Click += delegate { ExportReport(); };
-            Controls.Add(_header);
+            if (Program.BareLevel >= 1)
+            {
+                _header.Dock = DockStyle.Top;
+                _header.Subtitle = "Аудит лицензий на этом компьютере";
+                _header.RefreshButton.Click += delegate { StartScan(); };
+                _header.Export.Click += delegate { ExportReport(); };
+                Controls.Add(_header);
+            }
+
+            Shown += delegate
+            {
+                Diag.Log("form: shown");
+                if (Program.NavTest)
+                {
+                    for (int i = 0; i < _factories.Count; i++)
+                    {
+                        SelectPage(i);
+                        Diag.Log("nav " + i + " done");
+                    }
+                    BeginInvoke(new Action(delegate { Close(); }));
+                    return;
+                }
+                if (AutoScan && Program.BareLevel >= 4) StartScan();
+            };
+
+            if (Program.BareLevel < 4)
+            {
+                ResumeLayout(true);
+                return;
+            }
 
             BuildPages();
             ResumeLayout(true);
-
             KeyDown += MainFormKeyDown;
-            Shown += delegate
+        }
+
+        public void PrepareHandles()
+        {
+            try { CreateControl(); Diag.Log("form: own handle ok"); }
+            catch (Exception ex) { Diag.Log("form: OWN HANDLE FAILED " + ex.Message); return; }
+            ProbeChild(_header, "header");
+            ProbeChild(_nav, "nav");
+            ProbeChild(_status, "status");
+            for (int i = 0; i < _pages.Count; i++) ProbeChild(_pages[i], "page" + i);
+        }
+
+        private void ProbeHandles()
+        {
+            for (int i = 0; i < _pages.Count; i++)
             {
-                if (AutoScan) StartScan();
-            };
+                try
+                {
+                    _pages[i].CreateControl();
+                    Diag.Log("page " + i + ": handle ok");
+                }
+                catch (Exception ex)
+                {
+                    Diag.Log("page " + i + ": FAILED " + ex.GetType().Name + ": " + ex.Message);
+                }
+            }
+            ProbeChild(_header, "header");
+            ProbeChild(_nav, "nav");
+            ProbeChild(_status, "status");
+        }
+
+        private static void ProbeChild(Control c, string path)
+        {
+            try
+            {
+                c.CreateControl();
+            }
+            catch (Exception ex)
+            {
+                Diag.Log("FAIL " + path + " [" + c.GetType().Name + "]: " + ex.Message);
+            }
+            foreach (Control child in c.Controls)
+            {
+                ProbeChild(child, path + "/" + child.GetType().Name);
+            }
         }
 
         private void NavPaint(object sender, PaintEventArgs e)
@@ -202,18 +285,20 @@ namespace OneCLicenseInspector.Ui
             }
         }
 
+        private readonly List<Func<PageBase>> _factories = new List<Func<PageBase>>();
+
         private void BuildPages()
         {
-            AddPage(new OverviewPage(), "Обзор", "overview");
-            AddPage(new PlatformsPage(), "Платформы 1С", "platform");
-            AddPage(new HardwarePage(), "Аппаратные ключи", "key");
-            AddPage(new SoftwarePage(), "Программные лицензии", "file");
-            AddPage(new UsagePage(), "Использование", "usage");
-            AddPage(new JournalPage(), "Журнал", "journal");
-
-            SelectPage(_initialPage);
-
             _nav.Resize += delegate { LayoutNav(); };
+
+            RegisterPage("Обзор", "overview", delegate { return new OverviewPage(); });
+            RegisterPage("Платформы 1С", "platform", delegate { return new PlatformsPage(); });
+            RegisterPage("Аппаратные ключи", "key", delegate { return new HardwarePage(); });
+            RegisterPage("Программные лицензии", "file", delegate { return new SoftwarePage(); });
+            RegisterPage("Использование", "usage", delegate { return new UsagePage(); });
+            RegisterPage("Журнал", "journal", delegate { return new JournalPage(); });
+
+            SelectPage(Math.Max(0, Math.Min(_factories.Count - 1, _initialPage)));
             LayoutNav();
 
             Label footer = new Label();
@@ -228,21 +313,46 @@ namespace OneCLicenseInspector.Ui
             _nav.Controls.Add(footer);
         }
 
-        private void AddPage(PageBase page, string title, string icon)
+        private void RegisterPage(string title, string icon, Func<PageBase> factory)
         {
-            page.Visible = false;
-            page.Dock = DockStyle.Fill;
-            _content.Controls.Add(page);
-            _pages.Add(page);
+            int index = _factories.Count;
+            _factories.Add(factory);
+            _pages.Add(null);
 
             NavButton b = new NavButton();
             b.Text = title;
             b.Icon = icon;
             b.Width = 200;
-            int index = _navButtons.Count;
             b.Click += delegate { SelectPage(index); };
             _nav.Controls.Add(b);
             _navButtons.Add(b);
+        }
+
+        private PageBase EnsurePage(int index)
+        {
+            if (index < 0 || index >= _factories.Count) return null;
+            PageBase page = _pages[index];
+            if (page != null) return page;
+            try
+            {
+                page = _factories[index]();
+                page.Visible = false;
+                page.Dock = DockStyle.Fill;
+                _content.Controls.Add(page);
+                _pages[index] = page;
+                Diag.Log("page " + index + " ok");
+                if (_result != null)
+                {
+                    page.Bind(_result);
+                    page.ScrollTop();
+                }
+            }
+            catch (Exception ex)
+            {
+                Diag.Log("page " + index + " create failed: " + ex);
+                return null;
+            }
+            return page;
         }
 
         private void LayoutNav()
@@ -263,24 +373,22 @@ namespace OneCLicenseInspector.Ui
 
         private void SelectPage(int index)
         {
-            if (index < 0 || index >= _pages.Count) return;
-            if (_current == index)
-            {
-                _pages[index].Visible = true;
-                return;
-            }
+            if (index < 0 || index >= _factories.Count) return;
+            PageBase page = EnsurePage(index);
+            if (page == null) return;
+
             _content.SuspendLayout();
             for (int i = 0; i < _pages.Count; i++)
             {
                 bool on = i == index;
-                _pages[i].Visible = on;
+                if (_pages[i] != null) _pages[i].Visible = on;
                 _navButtons[i].Selected = on;
                 _navButtons[i].Invalidate();
             }
             _current = index;
             _content.ResumeLayout();
-            _pages[index].BringToFront();
-            _pages[index].Activated();
+            page.BringToFront();
+            page.Activated();
         }
 
         private void MainFormKeyDown(object sender, KeyEventArgs e)
@@ -342,8 +450,8 @@ namespace OneCLicenseInspector.Ui
             _header.Subtitle = r.System.ComputerName + "  ·  " + r.System.OsCaption + "  ·  " + r.System.OsArch;
             _header.Invalidate();
 
-            foreach (PageBase p in _pages) { p.Bind(r); p.ScrollTop(); }
-            BeginInvoke(new Action(delegate { foreach (PageBase p in _pages) p.ScrollTop(); }));
+            foreach (PageBase p in _pages) { if (p != null) { p.Bind(r); p.ScrollTop(); } }
+            BeginInvoke(new Action(delegate { foreach (PageBase p in _pages) { if (p != null) p.ScrollTop(); } }));
 
             _status.Busy = false;
             _status.LeftText = "Готово · найдено платформ: " + r.Platforms.Count + ", ключей: " + r.Sentinel.Keys.Count +

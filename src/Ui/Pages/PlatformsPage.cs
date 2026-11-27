@@ -10,6 +10,7 @@ namespace OneCLicenseInspector.Ui
         private DataGridView _grid;
         private KeyValueList _details;
         private List<PlatformInfo> _items = new List<PlatformInfo>();
+        private int _detailsRow;
 
         public PlatformsPage()
         {
@@ -33,7 +34,7 @@ namespace OneCLicenseInspector.Ui
             AddSpacer(10);
 
             _details = new KeyValueList();
-            AddRow(WithTitle("Выбранная платформа", Card(_details, new Padding(0))), 190);
+            _detailsRow = AddRow(WithTitle("Выбранная платформа", Card(_details, new Padding(0))), 190);
         }
 
         private DataGridViewColumn Column(string header, string prop, int weight)
@@ -115,6 +116,7 @@ namespace OneCLicenseInspector.Ui
             {
                 kv.Add(new KeyValuePair<string, string>("Платформа", "Выберите строку в таблице"));
                 _details.Set(kv);
+                ResizeDetails();
                 return;
             }
             kv.Add(new KeyValuePair<string, string>("Платформа", p.Family + " " + p.Version + " (" + p.Bitness + ")"));
@@ -125,6 +127,13 @@ namespace OneCLicenseInspector.Ui
             kv.Add(new KeyValuePair<string, string>("Источник сведений", p.Source + (string.IsNullOrEmpty(p.Comment) ? "" : " · " + p.Comment)));
             if (!string.IsNullOrEmpty(p.InstallDate)) kv.Add(new KeyValuePair<string, string>("Установлена", p.InstallDate));
             _details.Set(kv);
+            ResizeDetails();
+        }
+
+        private void ResizeDetails()
+        {
+            int w = Root.ClientSize.Width > 300 ? Root.ClientSize.Width - 12 : 900;
+            SetRowHeight(_detailsRow, Math.Max(120, _details.Measure(w) + 34));
         }
 
         private static void OpenFolder(string path)

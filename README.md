@@ -26,7 +26,7 @@
 
 ## Скачать
 
-Последний релиз: [страница Releases](https://github.com/bigsprut/1c-license-inspector/releases/latest). Каждый тег `v*` собирается автоматически в GitHub Actions.
+Последний релиз: [страница Releases](https://github.com/bigsprut/1c-license-inspector/releases/latest). Каждый тег `v*` собирается автоматически в GitHub Actions.\n\n**1.1.2** — исправлен запуск на Server 2003/2008: окна `DataGridView` больше не создаются до появления формы, страницы строятся по требованию, шрифты в пикселях (вёрстка не разъезжается при масштабировании).
 
 Готовый файл: [`dist/1C-License-Inspector.exe`](dist/1C-License-Inspector.exe) — без установки.
 
