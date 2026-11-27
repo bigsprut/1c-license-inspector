@@ -26,6 +26,7 @@ namespace OneCLicenseInspector.Ui
         private FlatButton _sessImport;
         private FlatButton _sessConsole;
         private FlatButton _sessGrab;
+        private FlatButton _sessAuto;
         private ScanResult _result;
         private List<SessionEntry> _sessionItems = new List<SessionEntry>();
 
@@ -151,6 +152,15 @@ namespace OneCLicenseInspector.Ui
             _sessGrab.Margin = new Padding(2, 2, 4, 2);
             _sessGrab.Click += delegate { GrabFromConsole(); };
             top.Controls.Add(_sessGrab);
+
+            _sessAuto = new FlatButton();
+            _sessAuto.Text = "Собрать авто";
+            _sessAuto.Icon = "refresh";
+            _sessAuto.Kind = ButtonKind.Primary;
+            _sessAuto.Size = new Size(150, 30);
+            _sessAuto.Margin = new Padding(2, 2, 4, 2);
+            _sessAuto.Click += delegate { AutoCollect82(); };
+            top.Controls.Add(_sessAuto);
 
             _sessHint = new Label();
             _sessHint.Dock = DockStyle.Bottom;
@@ -280,6 +290,44 @@ namespace OneCLicenseInspector.Ui
             BindSessions();
         }
 
+        private void AutoCollect82()
+        {
+            if (Console82Automation.FindConsole() == IntPtr.Zero)
+            {
+                OpenConsole82();
+                MessageBox.Show("Консоль открывается. Когда она загрузится, нажмите «Собрать авто» ещё раз.");
+                return;
+            }
+
+            string errProc, errSess;
+            string procTsv = Console82Automation.ReadTable("Рабочие процессы", out errProc);
+            string sessTsv = Console82Automation.ReadTable("Сеансы", out errSess);
+
+            Diag.Log("auto82: proc=" + (procTsv != null ? "ok" : "null") + " (" + errProc + "), sess=" + (sessTsv != null ? "ok" : "null") + " (" + errSess + ")");
+            string s1 = "", s2 = "";
+            if (!string.IsNullOrEmpty(procTsv)) Console82Apply.TryApply(_result, procTsv, out s1);
+            if (!string.IsNullOrEmpty(sessTsv)) Console82Apply.TryApply(_result, sessTsv, out s2);
+
+            if (string.IsNullOrEmpty(procTsv) && string.IsNullOrEmpty(sessTsv))
+            {
+                // Откат: забрать через Ctrl+C
+                string err;
+                string clip = Console82Automation.CopyTable(out err);
+                if (!string.IsNullOrEmpty(clip) && Console82Apply.TryApply(_result, clip, out s1))
+                {
+                    BindSessions();
+                    _sessHint.Text = "Взято из консоли 8.2: " + s1;
+                    return;
+                }
+                MessageBox.Show("Не удалось прочитать консоль.\r\nРабочие процессы: " + errProc +
+                                "\r\nСеансы: " + errSess + "\r\nБуфер: " + err);
+                return;
+            }
+
+            BindSessions();
+            _sessHint.Text = "Автосбор: " + (s1.Length > 0 ? "серверные — " + s1 : "серверные — нет данных") +
+                             " · " + (s2.Length > 0 ? "клиентские — " + s2 : "клиентские — нет данных");
+        }
         private void GrabFromConsole()
         {
             string error;
