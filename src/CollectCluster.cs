@@ -227,9 +227,9 @@ namespace OneCLicenseInspector
                         StringBuilder a = new StringBuilder();
                         if (!newStyle) a.Append(endpoint);
                         a.Append(" session list --cluster=").Append(e.Id).Append(" --licenses");
-                        if (cr[0].Length > 0) a.Append(" --cluster-user=\\\"").Append(cr[0]).Append(Char.Parse("\\\""));
-                        if (cr[1].Length > 0) a.Append(" --cluster-pwd=\\\"").Append(cr[1]).Append(Char.Parse("\\\""));
-                        if (newStyle) a.Append(Char.Parse(" ")).Append(endpoint);
+                        if (cr[0].Length > 0) a.Append(" --cluster-user=\"").Append(cr[0]).Append("\"");
+                        if (cr[1].Length > 0) a.Append(" --cluster-pwd=\"").Append(cr[1]).Append("\"");
+                        if (newStyle) a.Append(' ').Append(endpoint);
 
                         string so2, se2;
                         int rc2 = Exec.Run(c.RacPath, a.ToString(), 10000, out so2, out se2);
