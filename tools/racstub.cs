@@ -85,6 +85,13 @@ internal static class RacStub
             return 0;
         }
 
+        if (a.IndexOf("session info", StringComparison.Ordinal) >= 0)
+        {
+            // Режим open: в списке лицензии не отдаются, а по одному сеансу — да.
+            Write(SessionLic);
+            return 0;
+        }
+
         if (a.IndexOf("session list", StringComparison.Ordinal) >= 0)
         {
             if (a.IndexOf("--infobase=", StringComparison.Ordinal) >= 0)

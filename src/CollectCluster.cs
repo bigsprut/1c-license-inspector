@@ -353,6 +353,53 @@ namespace OneCLicenseInspector
                         s.LicenseShort = s.LicenseSeries + " " + s.MaxUsersCur + " " + s.MaxUsersAll;
                     c.Sessions.Add(s);
                 }
+
+                // Список сеансов без --licenses не содержит сведений о лицензиях, а сам --licenses
+                // на части кластеров отдаёт пусто. Пробуем добрать лицензию по каждому сеансу:
+                // session info --session=<uuid> --licenses.
+                if (licNote.Length > 0 && c.Sessions.Count > 0)
+                {
+                    string racForInfo = racUsed.Length > 0 ? racUsed : c.RacPath;
+                    int filled = 0, asked = 0;
+                    foreach (SessionEntry s in c.Sessions)
+                    {
+                        if (++asked > 15) break;
+                        if (string.IsNullOrEmpty(s.SessionId)) continue;
+                        if (!string.IsNullOrEmpty(s.LicenseType) || !string.IsNullOrEmpty(s.LicenseSeries)) continue;
+                        StringBuilder q = new StringBuilder("session info --cluster=").Append(e.Id)
+                            .Append(" --session=").Append(s.SessionId).Append(" --licenses");
+                        if (loginUsed.Length > 0)
+                        {
+                            q.Append(" --cluster-user=\"").Append(loginUsed).Append("\"");
+                            if (!string.IsNullOrEmpty(password)) q.Append(" --cluster-pwd=\"").Append(password).Append("\"");
+                        }
+                        q.Append(' ').Append(endpoint);
+                        string io, ie;
+                        int irc = Exec.Run(racForInfo, q.ToString(), 8000, out io, out ie);
+                        if (!string.IsNullOrEmpty(ie)) Diag.Log("rac session info err: " + ie.Trim());
+                        if (irc != 0) continue;
+                        List<Record> one = ParseRecords(io, "session");
+                        if (one.Count == 0) continue;
+                        Record r2 = one[0];
+                        s.LicenseType = r2.Get("license-type");
+                        s.LicenseSeries = r2.Get("series");
+                        s.LicenseFullName = r2.Get("full-name");
+                        s.IssuedByServer = r2.Get("issued-by-server");
+                        s.MaxUsersAll = r2.Get("max-users-all");
+                        s.MaxUsersCur = r2.Get("max-users-cur");
+                        s.LicenseShort = StripQuotes(r2.Get("short-presentation"));
+                        s.LicenseFull = StripQuotes(r2.Get("full-presentation"));
+                        if (string.IsNullOrEmpty(s.LicenseShort) && !string.IsNullOrEmpty(s.LicenseSeries))
+                            s.LicenseShort = s.LicenseSeries + " " + s.MaxUsersCur + " " + s.MaxUsersAll;
+                        if (!string.IsNullOrEmpty(s.LicenseType) || !string.IsNullOrEmpty(s.LicenseSeries)) filled++;
+                    }
+                    Diag.Log("rac session info: опрошено " + asked + ", с лицензией " + filled);
+                    if (filled > 0)
+                    {
+                        c.Note = (c.Note + " Сведения о лицензиях добраны по каждому сеансу (session info --licenses).").Trim();
+                        r.AddLog(LogLevel.Info, "Кластер", "Лицензии получены по сеансам: " + filled);
+                    }
+                }
             }
             r.AddLog(LogLevel.Info, "Кластер", "Сеансов: " + c.Sessions.Count);
         }
