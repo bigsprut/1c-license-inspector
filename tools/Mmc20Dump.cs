@@ -7,46 +7,48 @@ using System.Threading;
 namespace OneCLicenseInspector
 {
     /// <summary>
-    /// 32-битный помощник (оснастка 1С 8.2 — 32-битная): открывает консоль MMC,
-    /// находит узел и вызывает View.ExportList в Unicode-TSV (формат 3).
+    /// 32-битный помощник: читает таблицу из консоли 1С 8.2 через MMC 2.0
+    /// и вызывает View.ExportList (формат 3 — Unicode TSV).
     /// Аргументы: msc, node, outFile.
     /// </summary>
     internal static class Mmc20Dump
     {
+        private static readonly string LogPath = Path.Combine(Path.GetTempPath(), "mmc20dump.log");
+
+        private static void Log(string text)
+        {
+            try { File.AppendAllText(LogPath, DateTime.Now.ToString("HH:mm:ss.fff") + " " + text + "\r\n", Encoding.UTF8); }
+            catch { }
+        }
+
         [STAThread]
         private static int Main(string[] args)
         {
-            string logPath = Path.Combine(Path.GetTempPath(), "mmc20dump.log");
             try
             {
-                if (args.Length < 3)
-                {
-                    File.WriteAllText(logPath, "usage: Mmc20Dump <msc> <node> <out>", Encoding.UTF8);
-                    return 2;
-                }
+                Log("start args=" + args.Length);
+                for (int i = 0; i < args.Length; i++) Log("  arg" + i + "=[" + args[i] + "]");
+
+                if (args.Length < 3) return 2;
                 string msc = args[0];
                 string node = args[1];
                 string outFile = args[2];
 
                 Type t = Type.GetTypeFromProgID("MMC20.Application");
-                if (t == null)
-                {
-                    File.WriteAllText(outFile, "ERROR: MMC20.Application не зарегистрирован", Encoding.UTF8);
-                    return 3;
-                }
+                if (t == null) return 3;
                 object app = Activator.CreateInstance(t);
-                app.GetType().InvokeMember("UserControl", BindingFlags.SetProperty, null, app, new object[] { 0 });
+                try { app.GetType().InvokeMember("UserControl", BindingFlags.SetProperty, null, app, new object[] { 0 }); } catch { }
                 app.GetType().InvokeMember("Load", BindingFlags.InvokeMethod, null, app, new object[] { msc });
+                Log("loaded " + msc);
+
                 object doc = P(app, "Document");
                 object scope = P(doc, "ScopeNamespace");
                 object root = P(doc, "RootNode");
+                Log("root=" + Convert.ToString(P(root, "Name")));
 
-                object found = Find(scope, root, node, 0, 7, 0);
-                if (found == null)
-                {
-                    File.WriteAllText(outFile, "ERROR: узел не найден: " + node, Encoding.UTF8);
-                    return 4;
-                }
+                object found = Find(scope, root, node, 0, 7);
+                Log("found=" + (found != null));
+                if (found == null) return 4;
 
                 try { C(scope, "Expand", found); } catch { }
                 object view = P(doc, "ActiveView");
@@ -56,25 +58,19 @@ namespace OneCLicenseInspector
                 try { if (File.Exists(outFile)) File.Delete(outFile); } catch { }
                 view.GetType().InvokeMember("ExportList", BindingFlags.InvokeMethod, null, view, new object[] { outFile, 3 });
                 Thread.Sleep(300);
-
-                if (!File.Exists(outFile))
-                {
-                    File.WriteAllText(logPath, "export не создал файл: " + outFile, Encoding.UTF8);
-                    return 6;
-                }
-                File.WriteAllText(logPath, "ok " + new FileInfo(outFile).Length, Encoding.UTF8);
+                Log("export exists=" + File.Exists(outFile));
                 return 0;
             }
             catch (Exception ex)
             {
-                try { File.WriteAllText(logPath, "EX " + ex.GetType().Name + ": " + ex.Message); } catch { }
+                Log("EX " + ex.GetType().Name + ": " + ex.Message);
                 return 5;
             }
         }
 
-        private static object Find(object scope, object parent, string needle, int depth, int maxDepth, int budget)
+        private static object Find(object scope, object parent, string needle, int depth, int maxDepth)
         {
-            if (depth > maxDepth || budget > 800) return null;
+            if (depth > maxDepth) return null;
             try { C(scope, "Expand", parent); } catch { }
             Thread.Sleep(120);
 
@@ -84,13 +80,13 @@ namespace OneCLicenseInspector
             {
                 string name = "";
                 try { name = Convert.ToString(P(child, "Name")); } catch { }
+                if (depth <= 2) Log("  d" + depth + " [" + name + "]");
                 if (!string.IsNullOrEmpty(name) && name.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0) return child;
-                object deep = Find(scope, child, needle, depth + 1, maxDepth, budget + 1);
+                object deep = Find(scope, child, needle, depth + 1, maxDepth);
                 if (deep != null) return deep;
                 object next = null;
                 try { next = C(scope, "GetNext", child); } catch { next = null; }
                 child = next;
-                budget++;
             }
             return null;
         }

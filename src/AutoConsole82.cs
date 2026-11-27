@@ -29,6 +29,9 @@ namespace OneCLicenseInspector
                 if (r.Cluster != null && r.Cluster.Available && r.Cluster.Sessions.Count > 0)
                     return false;
 
+                string helperPath; string helperErr;
+                helperPath = Mmc20Reader.EnsureHelper(out helperErr);
+                r.AddLog(LogLevel.Info, "Консоль 8.2", "помощник: " + (helperPath ?? ("нет (" + helperErr + ")")));
                 string msc = FindMsc();
                 if (string.IsNullOrEmpty(msc))
                 {
@@ -37,13 +40,6 @@ namespace OneCLicenseInspector
                 }
 
                 r.AddLog(LogLevel.Info, "Консоль 8.2", "оснастка: " + msc);
-                string helper = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Mmc20Dump.exe");
-                if (!File.Exists(helper))
-                {
-                    r.AddLog(LogLevel.Warn, "Консоль 8.2",
-                        "не найден Mmc20Dump.exe рядом с программой — положите его в ту же папку, иначе автосбор 8.2 не работает");
-                    return false;
-                }
 
                 string errProc, errSess;
                 string procTsv = Mmc20Reader.ReadTable(msc, "Рабочие процессы", out errProc);
