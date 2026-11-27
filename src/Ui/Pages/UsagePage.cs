@@ -517,8 +517,7 @@ namespace OneCLicenseInspector.Ui
             foreach (SessionEntry s in c.Sessions)
             {
                 SessionRow row = new SessionRow();
-                row.Infobase = ShortInfobase(s.Infobase);
-                row.SessionId = s.SessionId;
+                row.Infobase = ShortInfobase(s.Infobase);                row.SessionId = s.SessionId;
                 row.StartedAt = ShortDate(s.StartedAt);
                 row.Host = s.Host;
                 row.User = string.IsNullOrEmpty(s.User) ? "—" : s.User;
@@ -611,7 +610,8 @@ namespace OneCLicenseInspector.Ui
             lines.Add("Пользователь : " + (string.IsNullOrEmpty(s.User) ? "(не определён)" : s.User));
             lines.Add("Компьютер    : " + s.Host);
             lines.Add("Приложение   : " + s.AppId);
-            lines.Add("База         : " + s.Infobase);
+            lines.Add("База         : " + s.Infobase +
+                      (!string.IsNullOrEmpty(s.InfobaseId) && s.InfobaseId != s.Infobase ? " (" + s.InfobaseId + ")" : ""));
             lines.Add("Начало       : " + s.StartedAt);
             if (!string.IsNullOrEmpty(s.LicenseType)) lines.Add("Тип лицензии : " + s.LicenseType);
             if (!string.IsNullOrEmpty(s.LicenseSeries)) lines.Add("Серия        : " + s.LicenseSeries);

@@ -316,6 +316,7 @@ namespace OneCLicenseInspector
         public string Host = "";
         public string AppId = "";
         public string Infobase = "";
+        public string InfobaseId = "";
         public string StartedAt = "";
         public string LicenseType = "";
         public string LicenseSeries = "";

@@ -330,6 +330,16 @@ namespace OneCLicenseInspector
 
                 List<Record> sessions = ParseRecords(so, "session");
                 Diag.Log("rac sessions parsed=" + sessions.Count);
+
+                // rac отдаёт в сеансе только UUID информационной базы — имена берём из
+                // infobase summary list, иначе в таблице «непонятные цифры».
+                Dictionary<string, string> baseNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (sessions.Count > 0)
+                {
+                    string racForNames = racUsed.Length > 0 ? racUsed : c.RacPath;
+                    LoadInfobaseNames(c, e.Id, loginUsed, password, endpoint, racForNames, baseNames);
+                }
+
                 foreach (Record rec in sessions)
                 {
                     SessionEntry s = new SessionEntry();
@@ -339,7 +349,10 @@ namespace OneCLicenseInspector
                     s.Host = rec.Get("host-name");
                     if (string.IsNullOrEmpty(s.Host)) s.Host = rec.Get("host");
                     s.AppId = rec.Get("app-id");
-                    s.Infobase = rec.Get("infobase");
+                    s.InfobaseId = rec.Get("infobase");
+                    string baseName;
+                    s.Infobase = baseNames.TryGetValue(s.InfobaseId, out baseName) && baseName.Length > 0
+                        ? baseName : s.InfobaseId;
                     s.StartedAt = rec.Get("started-at");
                     s.LicenseType = rec.Get("license-type");
                     s.LicenseSeries = rec.Get("series");
@@ -406,6 +419,50 @@ namespace OneCLicenseInspector
 
         private static readonly Dictionary<string, string[]> AdminNamesCache =
             new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Имена информационных баз по их UUID: rac в сеансе отдаёт только идентификатор,
+        /// а в таблице нужны имена, как в консоли администрирования.
+        /// </summary>
+        private static void LoadInfobaseNames(ClusterInfo c, string clusterId, string login, string password,
+            string endpoint, string racPath, Dictionary<string, string> map)
+        {
+            string[] variants = new string[]
+            {
+                "infobase summary list --cluster=" + clusterId,
+                "infobase list --cluster=" + clusterId
+            };
+            foreach (string command in variants)
+            {
+                StringBuilder q = new StringBuilder(command);
+                if (!string.IsNullOrEmpty(login))
+                {
+                    q.Append(" --cluster-user=\"").Append(login).Append("\"");
+                    if (!string.IsNullOrEmpty(password)) q.Append(" --cluster-pwd=\"").Append(password).Append("\"");
+                }
+                q.Append(' ').Append(endpoint);
+                string so, se;
+                int rc = Exec.Run(racPath, q.ToString(), 12000, out so, out se);
+                Diag.Log("rac " + command + ": rc=" + rc + " out=" + (so ?? "").Trim());
+                if (!string.IsNullOrEmpty(se)) Diag.Log("  err: " + se.Trim());
+                if (rc != 0 || LooksLikeError(so, se)) continue;
+
+                foreach (Record rec in ParseRecords(so, "infobase"))
+                {
+                    string id = rec.Get("infobase");
+                    string name = rec.Get("name");
+                    if (name.Length == 0) name = rec.Get("descr");
+                    if (id.Length == 0 || name.Length == 0) continue;
+                    if (!map.ContainsKey(id)) map[id] = name;
+                }
+                if (map.Count > 0)
+                {
+                    Diag.Log("infobase names=" + map.Count);
+                    return;
+                }
+            }
+            Diag.Log("infobase names: получить не удалось");
+        }
 
         /// <summary>
         /// Кандидаты rac в порядке предпочтения. По документации 1С версии сервера администрирования
