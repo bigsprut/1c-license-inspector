@@ -93,6 +93,16 @@ namespace OneCLicenseInspector.Ui
         public override void Bind(ScanResult r)
         {
             List<KeyValuePair<string, string>> info = new List<KeyValuePair<string, string>>();
+            int seatSum = 0;
+            bool seatUnlimited = false;
+            foreach (SentinelFeature f in r.Sentinel.Features)
+            {
+                if (f.IsUnlimited) seatUnlimited = true;
+                else seatSum += f.LimitNum > 0 ? f.LimitNum : 0;
+            }
+            string seats = seatUnlimited ? "∞" : (seatSum > 0 ? seatSum.ToString() : "нет данных");
+            info.Add(new KeyValuePair<string, string>("Лицензий всего",
+                r.LicenseFiles.Count + " файл(ов) *.lic (каждый файл = одна лицензия) · мест в аппаратных ключах: " + seats));
             info.Add(new KeyValuePair<string, string>("Каталоги поиска",
                 r.LicenseStorages.Count == 0 ? "стандартные каталоги отсутствуют" : string.Join("; ", r.LicenseStorages.ToArray())));
             info.Add(new KeyValuePair<string, string>("Отпечаток ПК",
