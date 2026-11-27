@@ -84,22 +84,74 @@ namespace OneCLicenseInspector
 
         public static void ParseLicense(string license, out string kind, out string pin, out int used, out int total)
         {
-            kind = ""; pin = ""; used = -1; total = -1;
+            string file;
+            ParseLicenseFull(license, out kind, out pin, out used, out total, out file);
+        }
+
+        /// <summary>
+        /// Полная строка лицензии из консоли 8.2, например:
+        /// «Сервер, 2068, <host>, 1541, <PIN> 20 20, File://C:/.../20170330191441.lic».
+        /// </summary>
+        public static void ParseLicenseFull(string license, out string kind, out string pin, out int used, out int total, out string file)
+        {
+            kind = ""; pin = ""; used = -1; total = -1; file = "";
             if (string.IsNullOrEmpty(license)) return;
-            int comma = license.IndexOf(',');
-            if (comma >= 0)
+
+            string[] segs = license.Split(',');
+            if (segs.Length == 0) return;
+            kind = segs[0].Trim();
+
+            List<int> numbers = new List<int>();
+            for (int i = 1; i < segs.Length; i++)
             {
-                kind = license.Substring(0, comma).Trim();
-                string rest = license.Substring(comma + 1).Trim();
-                string[] parts = rest.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length > 0) pin = parts[0];
-                if (parts.Length > 1) int.TryParse(parts[1], out used);
-                if (parts.Length > 2) int.TryParse(parts[2], out total);
+                string seg = segs[i].Trim();
+                if (seg.StartsWith("File://", StringComparison.OrdinalIgnoreCase))
+                {
+                    string p = seg.Substring(7).Trim();
+                    int slash = p.LastIndexOf('/');
+                    file = slash >= 0 ? p.Substring(slash + 1) : p;
+                    continue;
+                }
+                if (seg.Length == 0) continue;
+
+                string[] parts = seg.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string part in parts)
+                {
+                    int n;
+                    if (int.TryParse(part, out n)) numbers.Add(n);
+                }
+                if (pin.Length == 0)
+                {
+                    foreach (string part in parts)
+                    {
+                        string digits = part;
+                        if (digits.Length >= 6 && IsDigits(digits)) { pin = digits; break; }
+                    }
+                }
             }
-            else
+
+            // PIN мог оказаться в общем списке чисел
+            if (pin.Length == 0)
             {
-                kind = license.Trim();
+                foreach (int n in numbers)
+                {
+                    if (n >= 100000) { pin = n.ToString(); break; }
+                }
             }
+
+            // Два последних числа — «занято» и «всего»
+            if (numbers.Count >= 2)
+            {
+                used = numbers[numbers.Count - 2];
+                total = numbers[numbers.Count - 1];
+            }
+        }
+
+        private static bool IsDigits(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return false;
+            foreach (char c in s) if (c < '0' || c > '9') return false;
+            return true;
         }
 
         public static string LicenseUsageText(string license)

@@ -17,6 +17,7 @@ namespace OneCLicenseInspector.Ui
 
         private Panel _sessPanel;
         private DataGridView _sessions;
+        private DataGridView _procs;
         private TextBox _sessDetails;
         private Label _sessHint;
         private TextBox _sessServer;
@@ -182,21 +183,37 @@ namespace OneCLicenseInspector.Ui
             _sessDetails.Height = 96;
             EnableCopy(_sessDetails);
 
+            _procs = MakeGrid();
+            _procs.Columns.Add(Col("Компьютер", "Computer", 100));
+            _procs.Columns.Add(Col("Порт", "Port", 60));
+            _procs.Columns.Add(Col("Использование", "Usage", 100));
+            _procs.Columns.Add(Col("Включен", "Enabled", 70));
+            _procs.Columns.Add(Col("Активен", "Active", 70));
+            _procs.Columns.Add(Col("PID", "Pid", 60));
+            _procs.Columns.Add(Col("Память, KB", "Memory", 85));
+            _procs.Columns.Add(Col("Лицензия", "License", 80));
+            _procs.Columns.Add(Col("PIN", "Pin", 110));
+            _procs.Columns.Add(Col("Занято", "Used", 60));
+            _procs.Columns.Add(Col("Всего", "Total", 60));
+            _procs.Dock = DockStyle.Top;
+            _procs.Height = 150;
+
             _sessions = MakeGrid();
-            _sessions.Columns.Add(Col("Тип", "Type", 70));
-            _sessions.Columns.Add(Col("Пользователь", "User", 100));
-            _sessions.Columns.Add(Col("Компьютер", "Host", 90));
-            _sessions.Columns.Add(Col("Приложение", "AppId", 105));
+            _sessions.Columns.Add(Col("Инф. база", "Infobase", 100));
+            _sessions.Columns.Add(Col("Номер", "SessionId", 70));
             _sessions.Columns.Add(Col("Начало", "StartedAt", 140));
+            _sessions.Columns.Add(Col("Компьютер", "Host", 110));
+            _sessions.Columns.Add(Col("Пользователь", "User", 130));
+            _sessions.Columns.Add(Col("Приложение", "AppId", 110));
             _sessions.Columns.Add(Col("Лицензия", "License", 80));
             _sessions.Columns.Add(Col("PIN", "Pin", 110));
             _sessions.Columns.Add(Col("Занято", "Used", 60));
             _sessions.Columns.Add(Col("Всего", "Total", 60));
-            _sessions.Columns.Add(Col("Мест", "Seats", 60));
             _sessions.Dock = DockStyle.Fill;
             _sessions.SelectionChanged += delegate { ShowSessionDetails(); };
 
             _sessPanel.Controls.Add(_sessions);
+            _sessPanel.Controls.Add(_procs);
             _sessPanel.Controls.Add(_sessDetails);
             _sessPanel.Controls.Add(_sessHint);
             _sessPanel.Controls.Add(top);
@@ -429,39 +446,45 @@ namespace OneCLicenseInspector.Ui
             if (_result == null) return;
             ClusterInfo c = _result.Cluster;
 
-            List<SessionRow> rows = new List<SessionRow>();
-            _sessionItems = c.Sessions;
+            List<ProcessRow> prows = new List<ProcessRow>();
             foreach (SessionEntry s in c.Processes)
             {
-                SessionRow row = new SessionRow();
-                row.Type = "Процесс";
-                row.User = string.IsNullOrEmpty(s.User) ? "—" : s.User;
-                row.Host = s.Host;
-                row.AppId = s.AppId;
-                string procKind, procPin; int procUsed, procTotal;
-                Console82Import.ParseLicense(s.LicenseShort, out procKind, out procPin, out procUsed, out procTotal);
-                row.License = procKind;
-                row.Pin = procPin;
-                row.Used = procUsed >= 0 ? procUsed.ToString() : "";
-                row.Total = procTotal >= 0 ? procTotal.ToString() : "";
-                row.Seats = s.SessionId;
-                rows.Add(row);
+                ProcessRow pr = new ProcessRow();
+                pr.Computer = s.User;
+                pr.Port = (s.Host ?? "").TrimStart(':');
+                pr.Usage = s.Usage;
+                pr.Enabled = s.Enabled;
+                pr.Active = s.Active;
+                pr.Pid = s.SessionId;
+                pr.Memory = s.Memory;
+                string pk, pp, pf; int pu, pt;
+                Console82Import.ParseLicenseFull(s.LicenseShort, out pk, out pp, out pu, out pt, out pf);
+                pr.License = pk;
+                pr.Pin = pp;
+                pr.Used = pu >= 0 ? pu.ToString() : "";
+                pr.Total = pt >= 0 ? pt.ToString() : "";
+                prows.Add(pr);
             }
+            _procs.DataSource = null;
+            _procs.DataSource = prows;
+
+            List<SessionRow> rows = new List<SessionRow>();
+            _sessionItems = c.Sessions;
             foreach (SessionEntry s in c.Sessions)
             {
                 SessionRow row = new SessionRow();
-                row.Type = "Сеанс";
-                row.User = string.IsNullOrEmpty(s.User) ? "—" : s.User;
-                row.Host = s.Host;
-                row.AppId = s.AppId;
+                row.Infobase = ShortInfobase(s.Infobase);
+                row.SessionId = s.SessionId;
                 row.StartedAt = ShortDate(s.StartedAt);
-                string licKind, licPin; int licUsed, licTotal;
-                Console82Import.ParseLicense(s.LicenseShort, out licKind, out licPin, out licUsed, out licTotal);
+                row.Host = s.Host;
+                row.User = string.IsNullOrEmpty(s.User) ? "—" : s.User;
+                row.AppId = s.AppId;
+                string licKind, licPin, licFile; int licUsed, licTotal;
+                Console82Import.ParseLicenseFull(s.LicenseShort, out licKind, out licPin, out licUsed, out licTotal, out licFile);
                 row.License = licKind.Length > 0 ? licKind : LicenseText(s);
                 row.Pin = licPin;
                 row.Used = licUsed >= 0 ? licUsed.ToString() : "";
                 row.Total = licTotal >= 0 ? licTotal.ToString() : "";
-                row.Seats = string.IsNullOrEmpty(s.MaxUsersAll) ? s.MaxUsersCur : (s.MaxUsersCur + " / " + s.MaxUsersAll);
                 rows.Add(row);
             }
             _sessions.DataSource = null;
@@ -474,13 +497,11 @@ namespace OneCLicenseInspector.Ui
             }
             else if (c.Sessions.Count == 0 && c.Processes.Count == 0)
             {
-                _sessHint.Text = "Кластер " + c.Endpoint + " отвечает, активных сеансов нет. Если сеанс запущен — он может быть в файловой базе (не в кластере) или в другом кластере сервера." +
-                                 (string.IsNullOrEmpty(c.Error) ? "" : " " + c.Error);
+                _sessHint.Text = "Кластер " + c.Endpoint + " отвечает, активных сеансов нет.";
             }
             else
             {
-                _sessHint.Text = "Процессов (серверные): " + c.Processes.Count + " · сеансов (клиентские): " + c.Sessions.Count + " · " + c.Endpoint +
-                                 (string.IsNullOrEmpty(c.Error) ? "" : " · " + c.Error);
+                _sessHint.Text = "Процессов (серверные): " + c.Processes.Count + " · сеансов (клиентские): " + c.Sessions.Count + " · " + c.Endpoint;
             }
 
             if (rows.Count > 0)
@@ -489,6 +510,13 @@ namespace OneCLicenseInspector.Ui
                 _sessions.Rows[0].Selected = true;
             }
             ShowSessionDetails();
+        }
+
+
+        private static string ShortInfobase(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            return s.Length > 28 ? "…" + s.Substring(s.Length - 27) : s;
         }
 
         private static string ShortDate(string s)
@@ -597,16 +625,31 @@ namespace OneCLicenseInspector.Ui
 
         public class SessionRow
         {
-            public string Type { get; set; }
-            public string User { get; set; }
-            public string Host { get; set; }
-            public string AppId { get; set; }
+            public string Infobase { get; set; }
+            public string SessionId { get; set; }
             public string StartedAt { get; set; }
+            public string Host { get; set; }
+            public string User { get; set; }
+            public string AppId { get; set; }
             public string License { get; set; }
             public string Pin { get; set; }
             public string Used { get; set; }
             public string Total { get; set; }
-            public string Seats { get; set; }
+        }
+
+        public class ProcessRow
+        {
+            public string Computer { get; set; }
+            public string Port { get; set; }
+            public string Usage { get; set; }
+            public string Enabled { get; set; }
+            public string Active { get; set; }
+            public string Pid { get; set; }
+            public string Memory { get; set; }
+            public string License { get; set; }
+            public string Pin { get; set; }
+            public string Used { get; set; }
+            public string Total { get; set; }
         }
     }
 

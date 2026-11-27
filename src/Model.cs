@@ -326,6 +326,11 @@ namespace OneCLicenseInspector
         public string LicenseShort = "";
         public string LicenseFull = "";
         public string ClusterName = "";
+        public string Usage = "";
+        public string Enabled = "";
+        public string Active = "";
+        public string Memory = "";
+        public string LicenseFile = "";
     }
 
     public class ClusterInfo

@@ -25,6 +25,13 @@ namespace OneCLicenseInspector
                     se.AppId = pr.Usage;
                     se.LicenseShort = pr.License;
                     se.SessionId = pr.Pid;
+                    se.Usage = pr.Usage;
+                    se.Enabled = pr.Enabled;
+                    se.Active = pr.Active;
+                    se.Memory = pr.Memory;
+                    string lk, lp, lfile; int lu, lt;
+                    Console82Import.ParseLicenseFull(pr.License, out lk, out lp, out lu, out lt, out lfile);
+                    se.LicenseFile = lfile;
                     r.Cluster.Processes.Add(se);
                 }
                 r.Cluster.Available = true;
