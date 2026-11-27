@@ -218,13 +218,36 @@ namespace OneCLicenseInspector
                 Diag.Log("rac session list: rc=" + rc + " out=" + (so ?? "").Trim());
                 if (!string.IsNullOrEmpty(se)) Diag.Log("rac session list err: " + se.Trim());
 
-                // Если с правами не вышло — пробуем без них (кластер без пароля или rac не принимает параметры)
-                if ((rc != 0 || LooksLikeError(so, se)) && (!string.IsNullOrEmpty(user) || !string.IsNullOrEmpty(password)))
+                // rac без прав может вернуть пустой список с кодом 0 — пробуем варианты
+                bool empty = string.IsNullOrEmpty((so ?? "").Trim()) || (so ?? "").Trim().Length < 10;
+                if ((rc != 0 || LooksLikeError(so, se) || empty))
                 {
-                    string plainArgs = endpoint + " session list --cluster=" + e.Id + " --licenses";
-                    rc = Exec.Run(c.RacPath, plainArgs, 10000, out so, out se);
-                    Diag.Log("rac session list (без прав): rc=" + rc + " out=" + (so ?? "").Trim());
-                    if (!string.IsNullOrEmpty(se)) Diag.Log("rac session list (без прав) err: " + se.Trim());
+                    string[][] variants = new string[][]
+                    {
+                        new string[] { "", "" },
+                        new string[] { "Администратор", "" },
+                        new string[] { "Administrator", "" }
+                    };
+                    foreach (string[] v in variants)
+                    {
+                        if (v[0] == user && v[1] == password) continue;
+                        StringBuilder tryArgs = new StringBuilder();
+                        tryArgs.Append(endpoint);
+                        if (v[0].Length > 0) tryArgs.Append(" --cluster-user=\"").Append(v[0]).Append('"');
+                        if (v[1].Length > 0) tryArgs.Append(" --cluster-pwd=\"").Append(v[1]).Append('"');
+                        tryArgs.Append(" session list --cluster=").Append(e.Id).Append(" --licenses");
+
+                        string so2, se2;
+                        int rc2 = Exec.Run(c.RacPath, tryArgs.ToString(), 10000, out so2, out se2);
+                        Diag.Log("rac session list (" + (v[0].Length == 0 ? "без прав" : v[0]) + "): rc=" + rc2 + " out=" + (so2 ?? "").Trim());
+                        if (!string.IsNullOrEmpty(se2)) Diag.Log("  err: " + se2.Trim());
+
+                        if (rc2 == 0 && !LooksLikeError(so2, se2) && !string.IsNullOrEmpty((so2 ?? "").Trim()) && (so2 ?? "").Trim().Length > 10)
+                        {
+                            so = so2; se = se2; rc = rc2;
+                            break;
+                        }
+                    }
                 }
 
                 if (rc != 0 || LooksLikeError(so, se))
