@@ -6,6 +6,8 @@
 
 **Автор:** PrS · <bigsprut@mail.ru>
 
+*English version: [README.en.md](README.en.md)*
+
 ![Обзор](docs/img/overview.png)
 
 ## Возможности

@@ -1,0 +1,54 @@
+name: build-and-release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: ./tools/ci-prepare-version.ps1 -Tag "${{ github.ref_name }}"
+
+      - name: Build
+        shell: pwsh
+        run: ./build.ps1
+
+      - name: Show build result
+        shell: pwsh
+        run: Get-Item build/1C-License-Inspector.exe | Format-List Name, Length, LastWriteTime
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 1C-License-Inspector
+          path: build/1C-License-Inspector.exe
+          if-no-files-found: error
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag build/1C-License-Inspector.exe `
+              --title "1C License Inspector $tag" `
+              --notes "Automated build for $tag"
+          } else {
+            gh release upload $tag build/1C-License-Inspector.exe --clobber
+          }
