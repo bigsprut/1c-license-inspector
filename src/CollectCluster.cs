@@ -234,13 +234,15 @@ namespace OneCLicenseInspector
                     continue;
                 }
                 List<Record> sessions = ParseRecords(so, "session");
+                Diag.Log("rac sessions parsed=" + sessions.Count);
                 foreach (Record rec in sessions)
                 {
                     SessionEntry s = new SessionEntry();
                     s.ClusterName = e.Name;
                     s.SessionId = rec.Get("session");
                     s.User = rec.Get("user-name");
-                    s.Host = rec.Get("host");
+                    s.Host = rec.Get("host-name");
+                    if (string.IsNullOrEmpty(s.Host)) s.Host = rec.Get("host");
                     s.AppId = rec.Get("app-id");
                     s.Infobase = rec.Get("infobase");
                     s.StartedAt = rec.Get("started-at");
@@ -250,8 +252,10 @@ namespace OneCLicenseInspector
                     s.IssuedByServer = rec.Get("issued-by-server");
                     s.MaxUsersAll = rec.Get("max-users-all");
                     s.MaxUsersCur = rec.Get("max-users-cur");
-                    s.LicenseShort = rec.Get("short-presentation");
-                    s.LicenseFull = rec.Get("full-presentation");
+                    s.LicenseShort = StripQuotes(rec.Get("short-presentation"));
+                    s.LicenseFull = StripQuotes(rec.Get("full-presentation"));
+                    if (string.IsNullOrEmpty(s.LicenseShort) && !string.IsNullOrEmpty(s.LicenseSeries))
+                        s.LicenseShort = s.LicenseSeries + " " + s.MaxUsersCur + " " + s.MaxUsersAll;
                     c.Sessions.Add(s);
                 }
             }
@@ -370,6 +374,15 @@ namespace OneCLicenseInspector
                 }
             }
             catch { return false; }
+        }
+
+        private static string StripQuotes(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            s = s.Trim();
+            if (s.Length >= 2 && s[0] == '"') s = s.Substring(1);
+            if (s.Length >= 1 && s[s.Length - 1] == '"') s = s.Substring(0, s.Length - 1);
+            return s.Trim();
         }
 
         private static bool LooksLikeError(string stdout, string stderr)
