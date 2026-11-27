@@ -18,6 +18,8 @@ namespace OneCLicenseInspector.Ui
         private Panel _sessPanel;
         private DataGridView _sessions;
         private DataGridView _procs;
+        private Label _procsTitle;
+        private Label _sessTitle;
         private TextBox _sessDetails;
         private Label _sessHint;
         private TextBox _sessServer;
@@ -223,6 +225,14 @@ namespace OneCLicenseInspector.Ui
             _procs.Dock = DockStyle.Top;
             _procs.Height = 150;
 
+            _procsTitle = new Label();
+            _procsTitle.Dock = DockStyle.Top;
+            _procsTitle.Height = 22;
+            _procsTitle.Padding = new Padding(10, 4, 10, 0);
+            _procsTitle.ForeColor = Theme.Muted;
+            _procsTitle.Font = Theme.Small;
+            _procsTitle.Text = "Рабочие процессы (8.3 — rac process list, 8.2 — консоль администрирования)";
+
             _sessions = MakeGrid();
             _sessions.Columns.Add(Col("Инф. база", "Infobase", 100));
             _sessions.Columns.Add(Col("Номер", "SessionId", 70));
@@ -239,16 +249,53 @@ namespace OneCLicenseInspector.Ui
             _sessions.Dock = DockStyle.Fill;
             _sessions.SelectionChanged += delegate { ShowSessionDetails(); };
 
+            _sessTitle = new Label();
+            _sessTitle.Dock = DockStyle.Top;
+            _sessTitle.Height = 22;
+            _sessTitle.Padding = new Padding(10, 6, 10, 0);
+            _sessTitle.ForeColor = Theme.Muted;
+            _sessTitle.Font = Theme.Small;
+            _sessTitle.Text = "Сеансы и выданные лицензии";
+
             _sessPanel.Controls.Add(_sessions);
+            _sessPanel.Controls.Add(_sessTitle);
             _sessPanel.Controls.Add(_procs);
+            _sessPanel.Controls.Add(_procsTitle);
             _sessPanel.Controls.Add(_sessDetails);
             _sessPanel.Controls.Add(_sessHint);
             _sessPanel.Controls.Add(top);
             return _sessPanel;
         }
 
-        private static Label LabelFor(string text)
+        /// <summary>
+        /// Прячет столбцы, в которых нет ни одного значения: у 8.3 часть полей (лицензии по rphost,
+        /// «Активен») отсутствует, и пустые столбцы только мешают читать таблицу.
+        /// </summary>
+        private static void HideEmptyColumns(DataGridView grid, System.Collections.IEnumerable rows)
         {
+            try
+            {
+                List<object> list = new List<object>();
+                if (rows != null) foreach (object o in rows) list.Add(o);
+                foreach (DataGridViewColumn col in grid.Columns)
+                {
+                    string prop = col.DataPropertyName;
+                    if (string.IsNullOrEmpty(prop)) continue;
+                    bool any = false;
+                    foreach (object o in list)
+                    {
+                        System.Reflection.PropertyInfo pi = o.GetType().GetProperty(prop);
+                        if (pi == null) { any = true; break; }
+                        object v = pi.GetValue(o, null);
+                        if (v != null && v.ToString().Trim().Length > 0) { any = true; break; }
+                    }
+                    col.Visible = any;
+                }
+            }
+            catch { }
+        }
+
+        private static Label LabelFor(string text)        {
             Label l = new Label();
             l.Text = text;
             l.AutoSize = true;
@@ -505,12 +552,27 @@ namespace OneCLicenseInspector.Ui
                 int procCount; procUse.TryGetValue(pp, out procCount);
                 pr.Seats = pt >= 0 ? pt.ToString() : "";
                 pr.TypeCode = pu >= 0 ? pu.ToString() : "";
-                pr.Used = procCount.ToString();
+                // «Занято» считается по PIN лицензии: если лицензии у процесса нет (8.3),
+                // не показываем ноль — иначе столбец выглядит как «ничего не занято».
+                pr.Used = pp.Length > 0 ? procCount.ToString() : "";
                 pr.Free = pt > 0 ? Math.Max(0, pt - procCount).ToString() : "";
                 prows.Add(pr);
             }
             _procs.DataSource = null;
             _procs.DataSource = prows;
+
+            // Для 8.3 лицензионные столбцы у процессов пустые (лицензии по сеансам,
+            // а не по rphost) — прячем все столбцы без данных, чтобы таблица не выглядела
+            // «наполовину пустой».
+            HideEmptyColumns(_procs, prows);
+            // Нет процессов — не держим пустую таблицу на экране.
+            bool showProcs = prows.Count > 0;
+            try
+            {
+                _procs.Visible = showProcs;
+                if (_procsTitle != null) _procsTitle.Visible = showProcs;
+            }
+            catch { }
 
             List<SessionRow> rows = new List<SessionRow>();
             _sessionItems = c.Sessions;
@@ -529,12 +591,13 @@ namespace OneCLicenseInspector.Ui
                 int sessCount; sessUse.TryGetValue(licPin, out sessCount);
                 row.Seats = licTotal >= 0 ? licTotal.ToString() : "";
                 row.TypeCode = licUsed >= 0 ? licUsed.ToString() : "";
-                row.Used = sessCount.ToString();
+                row.Used = licPin.Length > 0 ? sessCount.ToString() : "";
                 row.Free = licTotal > 0 ? Math.Max(0, licTotal - sessCount).ToString() : "";
                 rows.Add(row);
             }
             _sessions.DataSource = null;
             _sessions.DataSource = rows;
+            HideEmptyColumns(_sessions, rows);
 
             if (!c.Available)
             {

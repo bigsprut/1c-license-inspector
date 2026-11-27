@@ -340,6 +340,11 @@ namespace OneCLicenseInspector
                     LoadInfobaseNames(c, e.Id, loginUsed, password, endpoint, racForNames, baseNames);
                 }
 
+                // Вторая таблица вкладки «Использование» — рабочие процессы (rphost).
+                // Для 8.3 её наполняет rac process list; 8.2 берёт данные из консоли.
+                string racForProc = racUsed.Length > 0 ? racUsed : c.RacPath;
+                LoadProcesses(c, e.Id, loginUsed, password, endpoint, racForProc);
+
                 foreach (Record rec in sessions)
                 {
                     SessionEntry s = new SessionEntry();
@@ -462,6 +467,60 @@ namespace OneCLicenseInspector
                 }
             }
             Diag.Log("infobase names: получить не удалось");
+        }
+
+        /// <summary>
+        /// Рабочие процессы кластера 8.3 (rphost) через `rac process list`. В таблице процессов
+        /// поля мапятся так же, как у 8.2: компьютер ← host, порт ← port, PID ← pid,
+        /// использование ← capacity, включен ← running, память ← memory-size (байты → КБ).
+        /// </summary>
+        private static void LoadProcesses(ClusterInfo c, string clusterId, string login, string password,
+            string endpoint, string racPath)
+        {
+            if (c.Processes.Count > 0) return; // уже есть данные из консоли 8.2
+            StringBuilder q = new StringBuilder("process list --cluster=").Append(clusterId);
+            if (!string.IsNullOrEmpty(login))
+            {
+                q.Append(" --cluster-user=\"").Append(login).Append("\"");
+                if (!string.IsNullOrEmpty(password)) q.Append(" --cluster-pwd=\"").Append(password).Append("\"");
+            }
+            q.Append(' ').Append(endpoint);
+
+            string so, se;
+            int rc = Exec.Run(racPath, q.ToString(), 12000, out so, out se);
+            Diag.Log("rac process list: rc=" + rc + " out=" + (so ?? "").Trim());
+            if (!string.IsNullOrEmpty(se)) Diag.Log("  err: " + se.Trim());
+            if (rc != 0 || LooksLikeError(so, se)) return;
+
+            foreach (Record rec in ParseRecords(so, "process"))
+            {
+                SessionEntry p = new SessionEntry();
+                p.SessionId = rec.Get("pid");
+                p.User = rec.Get("host");                  // в UI это «Компьютер»
+                p.Host = rec.Get("port");
+                p.Usage = rec.Get("capacity");
+                p.Enabled = YesNo(rec.Get("running"));
+                p.Active = "";
+                p.Memory = BytesToKb(rec.Get("memory-size"));
+                if (p.SessionId.Length == 0 && p.User.Length == 0) continue;
+                c.Processes.Add(p);
+            }
+            Diag.Log("rac processes parsed=" + c.Processes.Count);
+        }
+
+        private static string YesNo(string v)
+        {
+            v = (v ?? "").Trim();
+            if (v.Equals("yes", StringComparison.OrdinalIgnoreCase)) return "Да";
+            if (v.Equals("no", StringComparison.OrdinalIgnoreCase)) return "Нет";
+            return v;
+        }
+
+        private static string BytesToKb(string v)
+        {
+            long n;
+            if (!long.TryParse((v ?? "").Trim(), out n) || n <= 0) return "";
+            return (n / 1024).ToString("0");
         }
 
         /// <summary>

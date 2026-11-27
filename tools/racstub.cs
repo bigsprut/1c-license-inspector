@@ -116,7 +116,9 @@ internal static class RacStub
         {
             if (needAdmin) Fail("Администратор кластера не аутентифицирован");
             Write("process : bbbbbbbb-0000-0000-0000-000000000001\npid     : 4280\nrunning : yes\n" +
-                  "started-at : 2026-11-27T18:00:00\nexpired-timeout : 60\n");
+                  "started-at : 2026-11-27T18:00:00\nexpired-timeout : 60\n" +
+                  "capacity : 37\navailable-perfomance : 88\nmemory-size : 524288000\n" +
+                  "host : ALL\nport : 1560\nconnections : 3\n");
             return 0;
         }
 
