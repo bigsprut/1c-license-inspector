@@ -240,6 +240,9 @@ namespace OneCLicenseInspector.Ui
             if (r.Hasp4.UsbKeys.Count > 0)
             {
                 h.Add(new KeyValuePair<string, string>("USB-ключ", string.Join("; ", r.Hasp4.UsbKeys.ToArray())));
+                string devs = "HASP4: " + r.Hasp4.Hasp4Devices + ", Sentinel HL: " + r.Hasp4.HlDevices;
+                if (r.Hasp4.HlErrorDevices > 0) devs += " (с ошибкой драйвера: " + r.Hasp4.HlErrorDevices + ")";
+                h.Add(new KeyValuePair<string, string>("Устройства HASP", devs));
             }
             if (r.Hasp4.PortListening && r.Sentinel.Keys.Count == 0 && r.Hasp4.UsbKeys.Count > 0)
             {

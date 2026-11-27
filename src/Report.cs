@@ -134,6 +134,7 @@ namespace OneCLicenseInspector
             if (r.Hasp4.UsbKeys.Count > 0)
             {
                 Row(b, "USB-ключ", string.Join("; ", r.Hasp4.UsbKeys.ToArray()));
+                Row(b, "Устройства HASP", "HASP4: " + r.Hasp4.Hasp4Devices + ", Sentinel HL: " + r.Hasp4.HlDevices + (r.Hasp4.HlErrorDevices > 0 ? " (с ошибкой драйвера: " + r.Hasp4.HlErrorDevices + ")" : ""));
             }
             if (r.Hasp4.PortListening && r.Sentinel.Keys.Count == 0 && r.Hasp4.UsbKeys.Count > 0)
             {

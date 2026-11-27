@@ -171,6 +171,9 @@ namespace OneCLicenseInspector
         public string ReportedKeyId = "";
         public string ReportedKeyType = "";
         public List<string> UsbKeys = new List<string>();
+        public int Hasp4Devices;
+        public int HlDevices;
+        public int HlErrorDevices;
     }
 
     public class ServiceInfo

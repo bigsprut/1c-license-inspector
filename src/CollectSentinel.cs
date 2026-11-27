@@ -32,12 +32,20 @@ namespace OneCLicenseInspector
             try
             {
                 using (System.Management.ManagementObjectSearcher searcher =
-                    new System.Management.ManagementObjectSearcher("SELECT Name FROM Win32_PnPEntity WHERE Name LIKE '%HASP%' OR Name LIKE '%Sentinel%'"))
+                    new System.Management.ManagementObjectSearcher("SELECT Name,DeviceID,Status FROM Win32_PnPEntity WHERE Name LIKE '%HASP%' OR Name LIKE '%Sentinel%'"))
                 {
                     bool usbHasp = false;
                     foreach (System.Management.ManagementBaseObject o in searcher.Get())
                     {
                         string name = Convert.ToString(o["Name"]);
+                        string devid = Convert.ToString(o["DeviceID"]);
+                        string devStatus = Convert.ToString(o["Status"]);
+                        if (devid != null && devid.StartsWith(@"USB\HASP", StringComparison.OrdinalIgnoreCase)) r.Hasp4.Hasp4Devices++;
+                        else if (devid != null && devid.IndexOf("ALADDIN", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            r.Hasp4.HlDevices++;
+                            if (!string.Equals(devStatus, "OK", StringComparison.OrdinalIgnoreCase)) r.Hasp4.HlErrorDevices++;
+                        }
                         if (!string.IsNullOrEmpty(name) &&
                             (name.IndexOf("HASP", StringComparison.OrdinalIgnoreCase) >= 0 ||
                              name.IndexOf("Sentinel", StringComparison.OrdinalIgnoreCase) >= 0))
