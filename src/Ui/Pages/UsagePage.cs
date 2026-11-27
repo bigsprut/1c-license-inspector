@@ -125,6 +125,17 @@ namespace OneCLicenseInspector.Ui
             _sessRefresh.Size = new Size(132, 30);
             _sessRefresh.Margin = new Padding(2, 2, 4, 2);
             _sessRefresh.Click += delegate { RefreshCluster(); };
+            string savedEp, savedUser, savedPwd;
+            if (ClusterCredentials.Load(out savedEp, out savedUser, out savedPwd))
+            {
+                if (!string.IsNullOrEmpty(savedEp)) _sessServer.Text = savedEp;
+                _sessUser.Text = savedUser;
+                _sessPwd.Text = savedPwd;
+                Program.ClusterUser = savedUser;
+                Program.ClusterPwd = savedPwd;
+                if (!string.IsNullOrEmpty(savedEp)) Program.RasEndpoint = savedEp;
+            }
+
             _sessServer.TextChanged += delegate { Program.RasEndpoint = _sessServer.Text.Trim(); };
             _sessUser.TextChanged += delegate { Program.ClusterUser = _sessUser.Text.Trim(); };
             _sessPwd.TextChanged += delegate { Program.ClusterPwd = _sessPwd.Text; };
@@ -519,8 +530,15 @@ namespace OneCLicenseInspector.Ui
 
             if (!c.Available)
             {
-                _sessHint.Text = "Кластер недоступен: " + c.Error +
-                                 (string.IsNullOrEmpty(c.Note) ? "" : " " + c.Note);
+                string errText = c.Error ?? "";
+                bool auth = errText.IndexOf("авторизац", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            errText.IndexOf("authoriz", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            errText.IndexOf("аутентиф", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            errText.IndexOf("Невер", StringComparison.OrdinalIgnoreCase) >= 0;
+                _sessHint.Text = auth
+                    ? "Кластер требует администратора: укажите логин и пароль кластера в полях выше и нажмите «Обновить». (" + errText + ")"
+                    : "Кластер недоступен: " + errText +
+                      (string.IsNullOrEmpty(c.Note) ? "" : " " + c.Note);
             }
             else if (c.Sessions.Count == 0 && c.Processes.Count == 0)
             {
@@ -608,7 +626,7 @@ namespace OneCLicenseInspector.Ui
             ScanResult r = _result;
             Thread t = new Thread(delegate ()
             {
-                try { CollectCluster.Run(r, endpoint, user, pwd); }
+                try { CollectCluster.Run(r, endpoint, user, pwd); ClusterCredentials.Save(endpoint, user, pwd); }
                 catch (Exception ex) { r.Cluster.Error = ex.Message; }
                 try
                 {

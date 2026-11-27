@@ -39,7 +39,8 @@ try {
         'System.Xml.dll',
         'System.Xml.Linq.dll',
         'System.Management.dll',
-        'System.ServiceProcess.dll'
+        'System.ServiceProcess.dll',
+        'System.Security.dll'
     ) | ForEach-Object { Join-Path $netDir $_ }
 
     Get-Process '1C-License-Inspector' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue

@@ -162,6 +162,8 @@ namespace OneCLicenseInspector
             if (!string.IsNullOrEmpty(password)) clArgs += " --cluster-pwd=\"" + password + "\"";
             int code = Exec.Run(c.RacPath, clArgs, 6000, out output, out errorText);
             c.Raw = output;
+            Diag.Log("rac cluster list: rc=" + code + " out=" + (output ?? "").Trim());
+            if (!string.IsNullOrEmpty(errorText)) Diag.Log("rac cluster list err: " + errorText.Trim());
             if (code != 0 || LooksLikeError(output, errorText))
             {
                 c.Error = ShortError(output, errorText, code);
@@ -197,6 +199,8 @@ namespace OneCLicenseInspector
 
                 string so, se;
                 int rc = Exec.Run(c.RacPath, args.ToString(), 10000, out so, out se);
+                Diag.Log("rac session list: rc=" + rc + " out=" + (so ?? "").Trim());
+                if (!string.IsNullOrEmpty(se)) Diag.Log("rac session list err: " + se.Trim());
                 if (rc != 0 || LooksLikeError(so, se))
                 {
                     c.Error = ShortError(so, se, rc);
