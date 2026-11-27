@@ -50,6 +50,7 @@ namespace OneCLicenseInspector
         private static string _workingUser = "";
         private static int _sessionCount;
         private static int _processCount;
+        private static ScanResult _result;
 
         private static List<Cmd> _cmds;
         private static List<AdminRow> _admins;
@@ -70,6 +71,7 @@ namespace OneCLicenseInspector
             _clusterId = "";
             _clusterName = "";
             _workingUser = "";
+            _result = r;
 
             _endpoint = string.IsNullOrEmpty(endpoint) ? "localhost:1545" : endpoint.Trim();
             if (_endpoint.IndexOf(':') < 0) _endpoint += ":1545";
@@ -146,22 +148,25 @@ namespace OneCLicenseInspector
             }
             if (_clusterId.Length == 0) return;
 
-            Section("4. Администраторы кластера (cluster admin list)");
+            Section("4. Версия rac: какая платформа видит кластер");
+            ProbeRacVersions();
+
+            Section("5. Администраторы кластера (cluster admin list)");
             ProbeAdmins();
 
-            Section("5. Вход в кластер и список сеансов (session list)");
+            Section("6. Вход в кластер и список сеансов (session list)");
             ProbeSessionLogins();
 
             if (_workingUser.Length > 0 || _user.Length == 0)
             {
-                Section("6. Свойства кластера (cluster info)");
+                Section("7. Свойства кластера (cluster info)");
                 Do("Свойства кластера", Creds("cluster info --cluster=" + _clusterId, _workingUser));
             }
 
-            Section("7. Информационные базы (infobase list)");
+            Section("8. Информационные базы (infobase list)");
             ProbeInfobases();
 
-            Section("8. Рабочие серверы, процессы и соединения");
+            Section("9. Рабочие серверы, процессы и соединения");
             Do("Рабочие серверы (server list)", Creds("server list --cluster=" + _clusterId, _workingUser));
             Cmd procs = Do("Рабочие процессы (process list)", Creds("process list --cluster=" + _clusterId, _workingUser));
             if (procs.Ok)
@@ -172,7 +177,7 @@ namespace OneCLicenseInspector
 
             if (_infobases.Count > 0)
             {
-                Section("9. Сеансы по каждой информационной базе");
+                Section("10. Сеансы по каждой информационной базе");
                 int shown = 0;
                 int inBases = 0;
                 foreach (string ib in _infobases)
@@ -192,6 +197,43 @@ namespace OneCLicenseInspector
                     _sessionCount = inBases;
                     _verdict.Add("По инфобазам найдено сеансов: " + inBases + " (общий список их не показал).");
                 }
+            }
+        }
+
+        /// <summary>
+        /// Документация 1С: версии ras, кластера и rac должны совпадать, иначе rac может отвечать
+        /// успешно, но пусто. Перебираем rac всех установленных платформ и переключаемся на рабочий.
+        /// </summary>
+        private static void ProbeRacVersions()
+        {
+            List<string> candidates = CollectCluster.RacCandidates(_result, new ClusterInfo());
+            if (candidates.Count <= 1)
+            {
+                _body.AppendLine("   проверять нечего: установлена одна утилита rac (" + _rac + ")");
+                return;
+            }
+
+            string working = "";
+            foreach (string racPath in candidates)
+            {
+                Cmd c = Do("Сеансы, rac " + CollectCluster.VersionOf(racPath), "session list --cluster=" + _clusterId + " " + _endpoint, racPath);
+                if (working.Length == 0 && c.Ok && c.HasOut) working = racPath;
+            }
+
+            if (working.Length == 0)
+            {
+                _verdict.Add("Ни один из " + candidates.Count + " установленных rac не вернул сеансы — дело не в версии rac.");
+                return;
+            }
+            if (!string.Equals(working, _rac, StringComparison.OrdinalIgnoreCase))
+            {
+                _verdict.Add("Кластер отдаёт сеансы только rac " + CollectCluster.VersionOf(working) +
+                             " (остальные вернули пусто) — переключаюсь на него, дальше отчёт снят им.");
+                _rac = working;
+            }
+            else
+            {
+                _verdict.Add("Сеансы читает rac " + CollectCluster.VersionOf(working) + " — совпадает с версией ras/кластера.");
             }
         }
 
@@ -247,20 +289,28 @@ namespace OneCLicenseInspector
         private static void ProbeSessionLogins()
         {
             List<string> tried = new List<string>();
-            Cmd hit = null;
+            Cmd hit = null;      // успешный ответ, в котором есть сеансы
+            Cmd emptyOk = null;  // успешный ответ без сеансов
 
             if (_user.Length > 0)
             {
                 Cmd c = SessionsAttempt("логин из приложения: " + _user, _user);
                 tried.Add(_user);
-                if (c != null && c.Ok) { hit = c; _workingUser = _user; }
+                if (c != null && c.Ok)
+                {
+                    if (c.HasOut) { hit = c; _workingUser = _user; }
+                    else emptyOk = c;
+                }
             }
 
             if (hit == null)
             {
-                Cmd anon = Do("Без логина (анонимно)", "session list --cluster=" + _clusterId + " --licenses");
-                if (!anon.Ok) Do("Без логина, старый синтаксис", _endpoint + " session list --cluster=" + _clusterId);
-                if (anon.Ok && anon.HasOut) { hit = anon; _workingUser = ""; }
+                Cmd anon = SessionsAttempt("без логина (анонимно)", "");
+                if (anon != null && anon.Ok)
+                {
+                    if (anon.HasOut) { hit = anon; _workingUser = ""; }
+                    else if (emptyOk == null) emptyOk = anon;
+                }
             }
 
             if (hit == null)
@@ -276,9 +326,16 @@ namespace OneCLicenseInspector
                     if (_pwd.Length == 0) continue;
                     Cmd c = SessionsAttempt("логин из списка администраторов: " + a.Name, a.Name);
                     tried.Add(a.Name);
-                    if (c != null && c.Ok) { hit = c; _workingUser = a.Name; break; }
+                    if (c != null && c.Ok)
+                    {
+                        if (c.HasOut) { hit = c; _workingUser = a.Name; break; }
+                        if (emptyOk == null) emptyOk = c;
+                    }
                 }
             }
+
+            bool onlyWithoutLicenses = hit != null && hit.Args.IndexOf("--licenses", StringComparison.Ordinal) < 0;
+            if (hit == null) hit = emptyOk;
 
             if (hit != null) _sessionCount = CollectCluster.ParseRecords(hit.Out, "session").Count;
 
@@ -288,6 +345,9 @@ namespace OneCLicenseInspector
                              ". Сеансов: " + _sessionCount + ".");
                 if (_workingUser.Length > 0 && _user.Length > 0 && !string.Equals(_workingUser, _user, StringComparison.Ordinal))
                     _verdict.Add("Логин «" + _user + "» не подошёл, а «" + _workingUser + "» подошёл — подставьте его в поле «Логин».");
+                if (onlyWithoutLicenses)
+                    _verdict.Add("Запрос с --licenses вернул пусто, а без него сеансы видны. Сведения о лицензиях " +
+                                 "этот кластер через rac не отдаёт; приложение (1.5.29+) само повторяет запрос без --licenses.");
             }
             else
             {
@@ -299,21 +359,31 @@ namespace OneCLicenseInspector
             }
 
             if (_sessionCount == 0 && hit != null)
-                _verdict.Add("Сеансов ноль. Если в консоли они видны — опросите именно в тот момент, когда пользователи подключены " +
-                             "(сеансы кластера живут, пока клиент на связи).");
+                _verdict.Add("Сеансов ноль. Если в консоли они видны — значит rac их не показывает ни с --licenses, " +
+                             "ни без него; смотрите раздел 8 (process list) — живы ли рабочие процессы.");
         }
 
         private static Cmd SessionsAttempt(string title, string login)
         {
-            Cmd c = Do("Сеансы + лицензии, " + title,
-                Creds("session list --cluster=" + _clusterId + " --licenses", login));
-            if (!c.Ok)
-                c = Do("Сеансы + лицензии, старый синтаксис, " + title,
-                    _endpoint + " " + Creds("session list --cluster=" + _clusterId + " --licenses", login));
-            if (!c.Ok)
-                c = Do("Сеансы без --licenses, " + title,
-                    Creds("session list --cluster=" + _clusterId, login));
-            return c;
+            Cmd emptyOk = null;
+            string[] labels = new string[] { " + лицензии", " без --licenses" };
+            foreach (string label in labels)
+            {
+                bool lic = label.IndexOf("--licenses") >= 0;
+                Cmd c = Do("Сеансы" + label + ", " + title,
+                    Creds("session list --cluster=" + _clusterId + (lic ? " --licenses" : ""), login));
+                if (c.Ok && c.HasOut) return c;
+                if (c.Ok && emptyOk == null) emptyOk = c;
+            }
+            foreach (string label in labels)
+            {
+                bool lic = label.IndexOf("--licenses") >= 0;
+                Cmd c = Do("Сеансы" + label + ", старый синтаксис, " + title,
+                    OldCreds("session list --cluster=" + _clusterId + (lic ? " --licenses" : ""), login));
+                if (c.Ok && c.HasOut) return c;
+                if (c.Ok && emptyOk == null) emptyOk = c;
+            }
+            return emptyOk;
         }
 
         private static void ProbeInfobases()
@@ -356,7 +426,7 @@ namespace OneCLicenseInspector
             try
             {
                 using (System.Management.ManagementObjectSearcher s = new System.Management.ManagementObjectSearcher(
-                    "SELECT Name,DisplayName,State,StartMode FROM Win32_Service"))
+                    "SELECT Name,DisplayName,State,StartMode,PathName FROM Win32_Service"))
                 {
                     foreach (System.Management.ManagementBaseObject o in s.Get())
                     {
@@ -366,7 +436,10 @@ namespace OneCLicenseInspector
                         if (both.IndexOf("1cv8", StringComparison.OrdinalIgnoreCase) < 0 &&
                             both.IndexOf("1C:Enterprise", StringComparison.OrdinalIgnoreCase) < 0 &&
                             both.IndexOf("1С:Предприятие", StringComparison.OrdinalIgnoreCase) < 0) continue;
-                        agents.Add(Convert.ToString(o["State"]) + " · " + name + " · " + disp);
+                        string path = Convert.ToString(o["PathName"]);
+                        string ver = CollectCluster.VersionOf(path);
+                        agents.Add(Convert.ToString(o["State"]) + " · " + name +
+                                   " · версия " + (ver.Length == 0 ? "?" : ver) + " · " + path);
                     }
                 }
             }
@@ -377,6 +450,14 @@ namespace OneCLicenseInspector
             List<string> ras = RasProcesses();
             if (ras.Count == 0) Line("Процессы ras.exe", "запущенных нет (ras поднимает служба или его стартует приложение)");
             else foreach (string a in ras) Line("Процесс ras.exe", a);
+
+            string serverBin = CollectCluster.RunningServerBinDir();
+            Line("Версия сервера", serverBin.Length == 0
+                ? "ras/агент не запущены — не с чем сверять rac"
+                : CollectCluster.VersionOf(serverBin) + " (" + serverBin + ") · rac приложения: " + CollectCluster.VersionOf(_rac) +
+                  (string.Equals(CollectCluster.VersionOf(serverBin), CollectCluster.VersionOf(_rac), StringComparison.OrdinalIgnoreCase)
+                      ? " — совпадают"
+                      : " — РАЗЛИЧАЮТСЯ, rac может возвращать пусто"));
 
             List<string> ports = new List<string>();
             try
@@ -429,7 +510,9 @@ namespace OneCLicenseInspector
                 {
                     foreach (System.Management.ManagementBaseObject o in s.Get())
                     {
-                        list.Add("pid=" + Convert.ToString(o["ProcessId"]) + " · " + Convert.ToString(o["CommandLine"]));
+                        string cmd = Convert.ToString(o["CommandLine"]).Trim();
+                        list.Add("pid=" + Convert.ToString(o["ProcessId"]) +
+                                 " · версия " + CollectCluster.VersionOf(cmd) + " · " + cmd);
                     }
                 }
             }
@@ -475,15 +558,34 @@ namespace OneCLicenseInspector
 
         private static string Creds(string command, string login)
         {
-            if (string.IsNullOrEmpty(login)) return command;
             StringBuilder a = new StringBuilder(command);
-            a.Append(" --cluster-user=\"").Append(login).Append("\"");
-            if (_pwd.Length > 0) a.Append(" --cluster-pwd=\"").Append(_pwd).Append("\"");
+            AppendLogin(a, login);
             a.Append(' ').Append(_endpoint);
             return a.ToString();
         }
 
+        /// <summary>Старый синтаксис rac: адрес идёт первым аргументом и в конце не повторяется.</summary>
+        private static string OldCreds(string command, string login)
+        {
+            StringBuilder a = new StringBuilder(_endpoint).Append(' ');
+            a.Append(command);
+            AppendLogin(a, login);
+            return a.ToString();
+        }
+
+        private static void AppendLogin(StringBuilder a, string login)
+        {
+            if (string.IsNullOrEmpty(login)) return;
+            a.Append(" --cluster-user=\"").Append(login).Append("\"");
+            if (_pwd.Length > 0) a.Append(" --cluster-pwd=\"").Append(_pwd).Append("\"");
+        }
+
         private static Cmd Do(string title, string args)
+        {
+            return Do(title, args, _rac);
+        }
+
+        private static Cmd Do(string title, string args, string racPath)
         {
             Cmd c = new Cmd();
             c.Title = title;
@@ -492,12 +594,12 @@ namespace OneCLicenseInspector
             if (args.EndsWith(tail, StringComparison.Ordinal)) c.Args = Mask(args.Substring(0, args.Length - tail.Length)) + tail;
 
             string so, se;
-            try { c.Rc = Exec.Run(_rac, args, 20000, out so, out se); }
+            try { c.Rc = Exec.Run(racPath, args, 20000, out so, out se); }
             catch (Exception ex) { c.Rc = -1; so = ""; se = ex.Message; }
             c.Out = so ?? "";
             c.Err = se ?? "";
             _cmds.Add(c);
-            WriteCommand(c);
+            WriteCommand(c, racPath);
             return c;
         }
 
@@ -508,14 +610,15 @@ namespace OneCLicenseInspector
             return s;
         }
 
-        private static void WriteCommand(Cmd c)
+        private static void WriteCommand(Cmd c, string racPath)
         {
             _body.AppendLine();
             _body.AppendLine("── " + c.Title);
-            string head = c.Args.StartsWith(_endpoint + " ", StringComparison.Ordinal)
-                ? "rac " + c.Args
-                : "rac " + c.Args;
-            _body.AppendLine("   команда: " + head);
+            string ver = CollectCluster.VersionOf(racPath);
+            string tool = string.Equals(racPath, _rac, StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(ver)
+                ? "rac"
+                : "rac " + ver;
+            _body.AppendLine("   команда: " + tool + " " + c.Args);
             _body.AppendLine("   код возврата: " + c.Rc +
                              " · stdout: " + (c.HasOut ? CountLines(c.Out) + " строк" : "пусто") +
                              " · stderr: " + ((c.Err ?? "").Trim().Length > 0 ? CountLines(c.Err) + " строк" : "пусто"));

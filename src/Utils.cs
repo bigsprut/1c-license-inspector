@@ -517,9 +517,20 @@ namespace OneCLicenseInspector
             try
             {
                 string s = System.IO.File.ReadAllText(LogPath);
-                return s.Length <= maxChars ? s : s.Substring(s.Length - maxChars);
+                if (s.Length <= maxChars) return s;
+                return s.Substring(s.Length - maxChars);
             }
-            catch { return ""; }
+            catch { }
+            // если писать в %TEMP% запрещено (ограниченные права), журнал ведётся рядом с exe
+            try
+            {
+                string alt = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "1c-license-inspector.log");
+                string s = System.IO.File.ReadAllText(alt);
+                if (s.Length <= maxChars) return s;
+                return s.Substring(s.Length - maxChars);
+            }
+            catch { }
+            return "";
         }
 
         public static void Reset()

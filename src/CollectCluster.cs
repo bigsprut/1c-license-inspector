@@ -212,11 +212,20 @@ namespace OneCLicenseInspector
             }
 
             r.AddLog(LogLevel.Info, "Кластер", "Кластеров: " + c.Clusters.Count + " (" + endpoint + ")");
+
+            // Документация 1С: версии сервера администрирования (ras), кластера и утилиты rac должны
+            // совпадать. При расхождении rac отвечает успешно, но ПУСТО, поэтому перебираем rac
+            // от разных установленных платформ, начиная с той, что совпадает с работающим ras/агентом.
+            List<string> racs = RacCandidates(r, c);
+            if (racs.Count == 0 && !string.IsNullOrEmpty(c.RacPath)) racs.Add(c.RacPath);
+            Diag.Log("rac candidates: " + string.Join("; ", racs.ToArray()));
+
             foreach (ClusterEntry e in c.Clusters)
             {
                 string so = "", se = "";
                 int rc = -1;
                 string loginUsed = "";
+                string racUsed = "";
 
                 // Порядок попыток: новый синтаксис rac (8.3.24+: режим и команда первыми, адрес в конце),
                 // затем старый, затем логины из списка администраторов кластера.
@@ -224,7 +233,9 @@ namespace OneCLicenseInspector
                 // затирался ошибкой следующей попытки и на экран выходило «не аутентифицирован».
                 string firstErrOut = null, firstErrText = null;
                 int firstErrCode = 0;
-                bool got = false;
+                bool got = false;      // был хотя бы один успешный (rc=0) ответ
+                bool hasData = false;  // в успешном ответе были сеансы
+                string licNote = "";
 
                 string[][] creds = new string[][]
                 {
@@ -234,34 +245,55 @@ namespace OneCLicenseInspector
                     new string[] { "Administrator", "" }
                 };
 
-                for (int pass = 0; pass < 4 && !got; pass++)
+                for (int ri = 0; ri < racs.Count && !hasData; ri++)
                 {
-                    bool newStyle = pass == 0 || pass == 2;
-                    string[][] variants = creds;
-                    if (pass >= 2)
+                    string racPath = racs[ri];
+                    for (int pass = 0; pass < 4 && !hasData; pass++)
                     {
-                        variants = AdminNameCreds(r, c, e.Id, user, password);
-                        if (variants.Length == 0) continue;
-                    }
-
-                    foreach (string[] cr in variants)
-                    {
-                        string a = SessionArgs(endpoint, e.Id, cr[0], cr[1], newStyle);
-                        string so2, se2;
-                        int rc2 = Exec.Run(c.RacPath, a, 15000, out so2, out se2);
-                        Diag.Log("rac session list [" + (newStyle ? "new" : "old") + "," +
-                                 (cr[0].Length == 0 ? "no-auth" : cr[0]) + "]: rc=" + rc2 + " out=" + (so2 ?? "").Trim());
-                        if (!string.IsNullOrEmpty(se2)) Diag.Log("  err: " + se2.Trim());
-
-                        if (rc2 == 0 && !LooksLikeError(so2, se2))
+                        bool newStyle = pass == 0 || pass == 2;
+                        string[][] variants = creds;
+                        if (pass >= 2)
                         {
-                            got = true;
-                            so = so2; se = se2; rc = rc2; loginUsed = cr[0];
-                            break;
+                            variants = AdminNameCreds(r, c, e.Id, user, password, racPath);
+                            if (variants.Length == 0) continue;
                         }
-                        if (firstErrOut == null)
+
+                        foreach (string[] cr in variants)
                         {
-                            firstErrOut = so2; firstErrText = se2; firstErrCode = rc2;
+                            // --licenses на части кластеров возвращает успешный, но ПУСТОЙ ответ.
+                            // Тогда повторяем без него: список сеансов важнее сведений о лицензиях.
+                            foreach (bool licenses in new bool[] { true, false })
+                            {
+                                string a = SessionArgs(endpoint, e.Id, cr[0], cr[1], newStyle, licenses);
+                                string so2, se2;
+                                int rc2 = Exec.Run(racPath, a, 15000, out so2, out se2);
+                                Diag.Log("rac " + VersionOf(racPath) + " session list [" + (newStyle ? "new" : "old") + "," +
+                                         (cr[0].Length == 0 ? "no-auth" : cr[0]) + (licenses ? ",lic" : ",no-lic") +
+                                         "]: rc=" + rc2 + " out=" + (so2 ?? "").Trim());
+                                if (!string.IsNullOrEmpty(se2)) Diag.Log("  err: " + se2.Trim());
+
+                                if (rc2 == 0 && !LooksLikeError(so2, se2))
+                                {
+                                    if (!got)
+                                    {
+                                        got = true;
+                                        so = so2; se = se2; rc = rc2; loginUsed = cr[0]; racUsed = racPath;
+                                    }
+                                    if ((so2 ?? "").Trim().Length > 0)
+                                    {
+                                        so = so2; se = se2; rc = rc2; loginUsed = cr[0]; racUsed = racPath;
+                                        hasData = true;
+                                        if (!licenses)
+                                            licNote = "Кластер не отдаёт сведения о лицензиях через rac (запрос с --licenses вернул пусто) — сеансы прочитаны без них.";
+                                        break;
+                                    }
+                                }
+                                else if (firstErrOut == null)
+                                {
+                                    firstErrOut = so2; firstErrText = se2; firstErrCode = rc2;
+                                }
+                            }
+                            if (hasData) break;
                         }
                     }
                 }
@@ -272,15 +304,19 @@ namespace OneCLicenseInspector
                     r.AddLog(LogLevel.Warn, "Кластер", "session list: " + c.Error);
                     continue;
                 }
+
+                List<string> notes = new List<string>();
                 if (loginUsed.Length > 0 && loginUsed != user)
+                    notes.Add("Сеансы прочитаны логином «" + loginUsed + "».");
+                if (licNote.Length > 0) notes.Add(licNote);
+                if (racUsed.Length > 0 && racs.Count > 1 && !string.Equals(racUsed, racs[0], StringComparison.OrdinalIgnoreCase))
                 {
-                    c.Note = "Сеансы прочитаны логином «" + loginUsed + "».";
-                    r.AddLog(LogLevel.Info, "Кластер", c.Note);
+                    c.RacPath = racUsed;
+                    notes.Add("Сеансы читаются rac " + VersionOf(racUsed) + " — версия rac должна совпадать с ras и кластером; " +
+                              "rac " + VersionOf(racs[0]) + " вернул пустой список.");
                 }
-                else
-                {
-                    c.Note = "";
-                }
+                c.Note = string.Join(" ", notes.ToArray());
+                if (c.Note.Length > 0) r.AddLog(LogLevel.Info, "Кластер", c.Note);
                 try
                 {
                     string diagDir = Path.Combine(Paths.ProgramData, "1C-License-Inspector", "diag");
@@ -325,13 +361,159 @@ namespace OneCLicenseInspector
             new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
+        /// Кандидаты rac в порядке предпочтения. По документации 1С версии сервера администрирования
+        /// (ras) и кластера должны совпадать, а rac обязан соответствовать ras: иначе rac может
+        /// отвечать успешно, но ПУСТО. Поэтому первым идёт rac из той же платформы, что у работающего
+        /// ras/агента, затем остальные платформы от новой к старой.
+        /// </summary>
+        internal static List<string> RacCandidates(ScanResult r, ClusterInfo c)
+        {
+            List<string> list = new List<string>();
+            if (!string.IsNullOrEmpty(Program.RacOverride) && File.Exists(Program.RacOverride))
+            {
+                list.Add(Program.RacOverride);
+                return list;
+            }
+
+            string aligned = RunningServerBinDir();
+            if (aligned.Length > 0)
+            {
+                string p = Path.Combine(aligned, "rac.exe");
+                if (File.Exists(p)) list.Add(p);
+            }
+
+            List<PlatformInfo> plats = new List<PlatformInfo>();
+            foreach (PlatformInfo p in r.Platforms)
+            {
+                if (p.Family.IndexOf("8", StringComparison.Ordinal) < 0) continue;
+                if (string.IsNullOrEmpty(p.BinPath)) continue;
+                plats.Add(p);
+            }
+            // от новой версии к старой
+            for (int i = 1; i < plats.Count; i++)
+            {
+                PlatformInfo key = plats[i];
+                int j = i - 1;
+                while (j >= 0 && CompareVersions(plats[j].Version, key.Version) < 0)
+                {
+                    plats[j + 1] = plats[j];
+                    j--;
+                }
+                plats[j + 1] = key;
+            }
+            foreach (PlatformInfo p in plats)
+            {
+                string pth = Path.Combine(p.BinPath, "rac.exe");
+                if (File.Exists(pth) && !list.Contains(pth)) list.Add(pth);
+                if (list.Count >= 4) break;
+            }
+            if (!string.IsNullOrEmpty(c.RacPath) && File.Exists(c.RacPath) && !list.Contains(c.RacPath)) list.Add(c.RacPath);
+            return list;
+        }
+
+        /// <summary>Версия платформы из пути («…\8.3.27.2342\bin\rac.exe» → «8.3.27.2342»).</summary>
+        internal static string VersionOf(string path)
+        {
+            try
+            {
+                System.Text.RegularExpressions.Match m =
+                    System.Text.RegularExpressions.Regex.Match(path ?? "", @"\d+\.\d+\.\d+\.\d+");
+                if (m.Success) return m.Value;
+                return string.IsNullOrEmpty(path) ? "" : Path.GetFileNameWithoutExtension(path);
+            }
+            catch { return ""; }
+        }
+
+        private static int CompareVersions(string a, string b)
+        {
+            string[] pa = (a ?? "").Split('.');
+            string[] pb = (b ?? "").Split('.');
+            int n = pa.Length > pb.Length ? pa.Length : pb.Length;
+            for (int i = 0; i < n; i++)
+            {
+                int va = 0, vb = 0;
+                if (i < pa.Length) int.TryParse(pa[i], out va);
+                if (i < pb.Length) int.TryParse(pb[i], out vb);
+                if (va != vb) return va > vb ? 1 : -1;
+            }
+            return 0;
+        }
+
+        /// <summary>Каталог bin работающего ras.exe или агента сервера — эталон версии для rac.</summary>
+        internal static string RunningServerBinDir()
+        {
+            string result = "";
+            try
+            {
+                using (System.Management.ManagementObjectSearcher s = new System.Management.ManagementObjectSearcher(
+                    "SELECT Name,CommandLine,ExecutablePath FROM Win32_Process WHERE Name='ras.exe' OR Name='ragent.exe'"))
+                {
+                    foreach (System.Management.ManagementBaseObject o in s.Get())
+                    {
+                        string path = Convert.ToString(o["ExecutablePath"]);
+                        if (path.Length == 0)
+                        {
+                            string cmd = Convert.ToString(o["CommandLine"]).Trim();
+                            if (cmd.Length > 0)
+                            {
+                                if (cmd[0] == '"')
+                                {
+                                    int close = cmd.IndexOf('"', 1);
+                                    if (close > 1) path = cmd.Substring(1, close - 1);
+                                }
+                                else
+                                {
+                                    int sp = cmd.IndexOf(' ');
+                                    path = sp > 0 ? cmd.Substring(0, sp) : cmd;
+                                }
+                            }
+                        }
+                        if (path.Length == 0) continue;
+                        string dir = Path.GetDirectoryName(path);
+                        if (!string.IsNullOrEmpty(dir)) { result = dir; if (CanAlign(result)) return result; }
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                using (System.Management.ManagementObjectSearcher s = new System.Management.ManagementObjectSearcher(
+                    "SELECT Name,DisplayName,PathName,State FROM Win32_Service WHERE State='Running'"))
+                {
+                    foreach (System.Management.ManagementBaseObject o in s.Get())
+                    {
+                        string both = Convert.ToString(o["Name"]) + " " + Convert.ToString(o["DisplayName"]);
+                        bool agent = both.IndexOf("Server Agent", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                     both.IndexOf("Агент сервера", StringComparison.OrdinalIgnoreCase) >= 0;
+                        if (!agent) continue;
+                        string path = Convert.ToString(o["PathName"]).Trim().Trim('"');
+                        int exe = path.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+                        if (exe > 0) path = path.Substring(0, exe + 4);
+                        string dir = Path.GetDirectoryName(path.Trim('"'));
+                        if (!string.IsNullOrEmpty(dir) && CanAlign(dir)) return dir;
+                    }
+                }
+            }
+            catch { }
+            return result;
+        }
+
+        private static bool CanAlign(string binDir)
+        {
+            try { return binDir.Length > 0 && File.Exists(Path.Combine(binDir, "rac.exe")); }
+            catch { return false; }
+        }
+
+        /// <summary>
         /// Логины администраторов кластера — из «cluster admin list». Нужны, когда в приложении
         /// ввели не то имя: rac сам подсказывает, какие имена вообще существуют. Пароль берём
         /// только тот, что ввёл пользователь, — чужих паролей у нас нет.
         /// </summary>
-        private static string[][] AdminNameCreds(ScanResult r, ClusterInfo c, string clusterId, string user, string password)
+        private static string[][] AdminNameCreds(ScanResult r, ClusterInfo c, string clusterId, string user, string password, string racPath)
         {
-            string key = c.Endpoint + "|" + clusterId;
+            if (string.IsNullOrEmpty(racPath)) racPath = c.RacPath;
+            string key = c.Endpoint + "|" + clusterId + "|" + racPath;
             string[] names;
             if (!AdminNamesCache.TryGetValue(key, out names))
             {
@@ -344,10 +526,10 @@ namespace OneCLicenseInspector
                     {
                         a.Append(" --cluster-user=\"").Append(login).Append("\"");
                         if (!string.IsNullOrEmpty(password)) a.Append(" --cluster-pwd=\"").Append(password).Append("\"");
-                        a.Append(' ').Append(c.Endpoint);
                     }
+                    a.Append(' ').Append(c.Endpoint);
                     string so, se;
-                    int rc = Exec.Run(c.RacPath, a.ToString(), 15000, out so, out se);
+                    int rc = Exec.Run(racPath, a.ToString(), 15000, out so, out se);
                     Diag.Log("rac cluster admin list [" + (login.Length == 0 ? "no-auth" : login) + "]: rc=" + rc +
                              " out=" + (so ?? "").Trim());
                     if (rc != 0 || LooksLikeError(so, se)) continue;
@@ -375,11 +557,12 @@ namespace OneCLicenseInspector
             return creds.ToArray();
         }
 
-        internal static string SessionArgs(string endpoint, string clusterId, string login, string pwd, bool newStyle)
+        internal static string SessionArgs(string endpoint, string clusterId, string login, string pwd, bool newStyle, bool licenses)
         {
             StringBuilder a = new StringBuilder();
             if (!newStyle) a.Append(endpoint).Append(' ');
-            a.Append("session list --cluster=").Append(clusterId).Append(" --licenses");
+            a.Append("session list --cluster=").Append(clusterId);
+            if (licenses) a.Append(" --licenses");
             if (!string.IsNullOrEmpty(login)) a.Append(" --cluster-user=\"").Append(login).Append("\"");
             if (!string.IsNullOrEmpty(pwd)) a.Append(" --cluster-pwd=\"").Append(pwd).Append("\"");
             if (newStyle) a.Append(' ').Append(endpoint);
