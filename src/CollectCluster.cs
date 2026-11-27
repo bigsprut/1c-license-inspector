@@ -374,13 +374,24 @@ namespace OneCLicenseInspector
 
         private static bool LooksLikeError(string stdout, string stderr)
         {
-            string all = (stdout + " " + stderr).ToLowerInvariant();
-            if (all.IndexOf("access denied", StringComparison.Ordinal) >= 0) return true;
-            if (all.IndexOf("not authorized", StringComparison.Ordinal) >= 0) return true;
-            if (all.IndexOf("отказано", StringComparison.Ordinal) >= 0) return true;
-            if (all.IndexOf("недостаточно прав", StringComparison.Ordinal) >= 0) return true;
-            if (all.IndexOf("error", StringComparison.Ordinal) >= 0 && all.IndexOf("cluster :", StringComparison.Ordinal) < 0) return true;
-            if (all.IndexOf("ошибка", StringComparison.Ordinal) >= 0 && all.IndexOf("cluster :", StringComparison.Ordinal) < 0) return true;
+            string err = (stderr ?? "").ToLowerInvariant();
+            if (err.IndexOf("access denied", StringComparison.Ordinal) >= 0) return true;
+            if (err.IndexOf("not authorized", StringComparison.Ordinal) >= 0) return true;
+            if (err.IndexOf("отказано", StringComparison.Ordinal) >= 0) return true;
+            if (err.IndexOf("недостаточно прав", StringComparison.Ordinal) >= 0) return true;
+            if (err.IndexOf("ошибка", StringComparison.Ordinal) >= 0) return true;
+            if (err.IndexOf("error", StringComparison.Ordinal) >= 0) return true;
+
+            // stdout может содержать служебные поля со словом error (errors-count-threshold),
+            // поэтому ищем только явные признаки ошибки в начале строки.
+            string[] lines = (stdout ?? "").Replace("\r", "").Split('\n');
+            foreach (string raw in lines)
+            {
+                string line = raw.Trim().ToLowerInvariant();
+                if (line.StartsWith("ошибка") || line.StartsWith("error:") ||
+                    line.StartsWith("не удалось") || line.StartsWith("failed"))
+                    return true;
+            }
             return false;
         }
 
@@ -390,7 +401,21 @@ namespace OneCLicenseInspector
             if (all.Length == 0) all = (stdout ?? "").Trim();
             if (all.Length == 0) all = "код возврата " + code;
             string[] lines = all.Replace("\r", "").Split('\n');
-            string s = lines.Length > 0 ? lines[0].Trim() : all;
+            string s = "";
+            foreach (string raw in lines)
+            {
+                string line = raw.Trim();
+                string lowLine = line.ToLowerInvariant();
+                if (lowLine.StartsWith("ошибка") || lowLine.StartsWith("error:") ||
+                    lowLine.StartsWith("не удалось") || lowLine.StartsWith("failed") ||
+                    lowLine.IndexOf("access denied", StringComparison.Ordinal) >= 0 ||
+                    lowLine.IndexOf("отказано", StringComparison.Ordinal) >= 0)
+                {
+                    s = line;
+                    break;
+                }
+            }
+            if (s.Length == 0) s = lines.Length > 0 ? lines[0].Trim() : all;
             if (s.Length > 300) s = s.Substring(0, 300) + "…";
             string low = all.ToLowerInvariant();
             if (low.IndexOf("access denied", StringComparison.Ordinal) >= 0 || low.IndexOf("отказано", StringComparison.Ordinal) >= 0)
