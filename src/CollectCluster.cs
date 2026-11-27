@@ -172,12 +172,15 @@ namespace OneCLicenseInspector
             }
             c.Available = true;
 
+            // частая ошибка: указывают порт кластера 1541 вместо ras 1545
+            if (endpoint.EndsWith(":1541", StringComparison.OrdinalIgnoreCase))
+                endpoint = endpoint.Substring(0, endpoint.Length - 5) + ":1545";
             string output, errorText;
-            int code = Exec.Run(c.RacPath, "cluster list " + endpoint, 6000, out output, out errorText);
+            int code = Exec.Run(c.RacPath, "cluster list " + endpoint, 15000, out output, out errorText);
             if (code != 0 || LooksLikeError(output, errorText))
             {
                 // старый синтаксис (<host> <command>) для платформ до 8.3.24
-                code = Exec.Run(c.RacPath, endpoint + " cluster list", 6000, out output, out errorText);
+                code = Exec.Run(c.RacPath, endpoint + " cluster list", 15000, out output, out errorText);
             }
             c.Raw = output;
             Diag.Log("rac cluster list: rc=" + code + " out=" + (output ?? "").Trim());
@@ -232,7 +235,7 @@ namespace OneCLicenseInspector
                         if (newStyle) a.Append(' ').Append(endpoint);
 
                         string so2, se2;
-                        int rc2 = Exec.Run(c.RacPath, a.ToString(), 10000, out so2, out se2);
+                        int rc2 = Exec.Run(c.RacPath, a.ToString(), 15000, out so2, out se2);
                         Diag.Log("rac session list [" + (newStyle ? "new" : "old") + "," + (cr[0].Length == 0 ? "no-auth" : cr[0]) + "]: rc=" + rc2 + " out=" + (so2 ?? "").Trim());
                         if (!string.IsNullOrEmpty(se2)) Diag.Log("  err: " + se2.Trim());
 
