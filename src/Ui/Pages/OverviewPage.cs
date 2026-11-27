@@ -103,7 +103,7 @@ namespace OneCLicenseInspector.Ui
             _cSeats.Invalidate();
 
             _cFiles.Value = r.LicenseFiles.Count.ToString();
-            _cFiles.Hint = r.LicenseFiles.Count == 0 ? "файлы не найдены" : "активированы на ПК";
+            _cFiles.Hint = r.LicenseFiles.Count == 0 ? "лицензий не найдено" : "лицензий (1 файл = 1 лицензия)";
             _cFiles.Invalidate();
 
             List<StatusItem> items = new List<StatusItem>();

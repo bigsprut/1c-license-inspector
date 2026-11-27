@@ -177,7 +177,7 @@ namespace OneCLicenseInspector
                 b.AppendLine("<p class=\"muted\">Каталоги поиска: " + H(string.Join("; ", r.LicenseStorages.ToArray())) + "</p>");
             int seatSumR = 0; bool seatUnlimR = false;
             foreach (SentinelFeature f in r.Sentinel.Features) { if (f.IsUnlimited) seatUnlimR = true; else seatSumR += f.LimitNum > 0 ? f.LimitNum : 0; }
-            Row(b, "Лицензий всего", r.LicenseFiles.Count + " файл(ов) *.lic · мест в аппаратных ключах: " + (seatUnlimR ? "∞" : (seatSumR > 0 ? seatSumR.ToString() : "нет данных")));
+            Row(b, "Лицензий всего", "Лицензий: " + r.LicenseFiles.Count + " (1 файл *.lic = 1 лицензия) · мест в аппаратных ключах: " + (seatUnlimR ? "∞" : (seatSumR > 0 ? seatSumR.ToString() : "нет данных")));
             }
             if (r.LicenseFiles.Count == 0)
             {

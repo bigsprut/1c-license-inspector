@@ -50,6 +50,7 @@ namespace OneCLicenseInspector
             r.HostId = ReadHostId();
             r.LicenseRing = FindRing(r.Platforms);
             r.JavaPath = FindJava();
+            if (r.LicenseFiles.Count == 0) BroadSearch(r);
             if (!string.IsNullOrEmpty(r.LicenseRing))
             {
                 r.LicenseRingOutput = RunRing(r.LicenseRing, r.LicenseStorages);
@@ -71,6 +72,53 @@ namespace OneCLicenseInspector
             }
         }
 
+        /// <summary>Если в стандартных каталогах пусто — ищем *.lic по системе (не глубже 4 уровней).</summary>
+        private static void BroadSearch(ScanResult r)
+        {
+            List<string> roots = new List<string>();
+            roots.Add(Paths.ProgramData);
+            roots.Add(Paths.WindowsDir);
+            try
+            {
+                string drive = (Environment.GetEnvironmentVariable("SystemDrive") ?? "C:") + "\\";
+                foreach (string baseDir in new string[] { "Users", "Documents and Settings" })
+                {
+                    string root = Path.Combine(drive, baseDir);
+                    if (!Directory.Exists(root)) continue;
+                    foreach (string user in Directory.GetDirectories(root)) roots.Add(user);
+                }
+            }
+            catch { }
+
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string root in roots)
+            {
+                if (!Directory.Exists(root)) continue;
+                WalkForLicenses(root, 0, r, seen);
+                if (r.LicenseFiles.Count > 0) break;
+            }
+            if (r.LicenseFiles.Count > 0)
+            {
+                r.AddLog(LogLevel.Info, "Лицензии", "Файлы *.lic найдены расширенным поиском: " + r.LicenseFiles.Count);
+            }
+        }
+
+        private static void WalkForLicenses(string dir, int depth, ScanResult r, HashSet<string> seen)
+        {
+            if (depth > 4) return;
+            try
+            {
+                foreach (string f in Directory.GetFiles(dir, "*.lic"))
+                {
+                    string full = Path.GetFullPath(f);
+                    if (!seen.Add(full)) continue;
+                    r.LicenseFiles.Add(ReadLicenseFile(full));
+                    AddUniquePath(r.LicenseStorages, Path.GetDirectoryName(full));
+                }
+                foreach (string sub in Directory.GetDirectories(dir)) WalkForLicenses(sub, depth + 1, r, seen);
+            }
+            catch { }
+        }
         private static List<string> BuildStorages()
         {
             List<string> list = new List<string>();
@@ -86,7 +134,55 @@ namespace OneCLicenseInspector
                 AddUniquePath(list, Path.Combine(allUsers, "1C", "licenses"));
             }
             catch { }
+
+            // Профиль службы 1С (LocalSystem/NetworkService): там же 1С хранит
+            // локальные лицензии, активированные сервером.
+            AddSystemProfileStorages(list);
+
+            // Профили всех пользователей: лицензии, активированные в клиенте.
+            AddAllUserStorages(list);
             return list;
+        }
+
+        private static void AddSystemProfileStorages(List<string> list)
+        {
+            string[] roots = new string[]
+            {
+                Path.Combine(Paths.WindowsDir, "System32", "config", "systemprofile", "AppData"),
+                Path.Combine(Paths.WindowsDir, "SysWOW64", "config", "systemprofile", "AppData")
+            };
+            foreach (string appData in roots)
+            {
+                foreach (string sub in new string[] { "Local", "Roaming", "LocalLow" })
+                {
+                    AddUniquePath(list, Path.Combine(appData, sub, "1C", "licenses"));
+                }
+            }
+        }
+
+        private static void AddAllUserStorages(List<string> list)
+        {
+            string[] userRoots = new string[]
+            {
+                Path.Combine((Environment.GetEnvironmentVariable("SystemDrive") ?? "C:") + "\\", "Users"),
+                Path.Combine((Environment.GetEnvironmentVariable("SystemDrive") ?? "C:") + "\\", "Documents and Settings")
+            };
+            foreach (string root in userRoots)
+            {
+                try
+                {
+                    if (!Directory.Exists(root)) continue;
+                    foreach (string user in Directory.GetDirectories(root))
+                    {
+                        AddUniquePath(list, Path.Combine(user, "AppData", "Local", "1C", "licenses"));
+                        AddUniquePath(list, Path.Combine(user, "AppData", "Roaming", "1C", "licenses"));
+                        // Windows Server 2003 / XP
+                        AddUniquePath(list, Path.Combine(user, "Local Settings", "Application Data", "1C", "licenses"));
+                        AddUniquePath(list, Path.Combine(user, "Application Data", "1C", "licenses"));
+                    }
+                }
+                catch { }
+            }
         }
 
         private static void AddUniquePath(List<string> list, string path)

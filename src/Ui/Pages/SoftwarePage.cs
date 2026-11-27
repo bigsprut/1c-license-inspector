@@ -102,7 +102,7 @@ namespace OneCLicenseInspector.Ui
             }
             string seats = seatUnlimited ? "∞" : (seatSum > 0 ? seatSum.ToString() : "нет данных");
             info.Add(new KeyValuePair<string, string>("Лицензий всего",
-                r.LicenseFiles.Count + " файл(ов) *.lic (каждый файл = одна лицензия) · мест в аппаратных ключах: " + seats));
+                "Лицензий: " + r.LicenseFiles.Count + " (1 файл *.lic = 1 лицензия) · мест в аппаратных ключах: " + seats));
             info.Add(new KeyValuePair<string, string>("Каталоги поиска",
                 r.LicenseStorages.Count == 0 ? "стандартные каталоги отсутствуют" : string.Join("; ", r.LicenseStorages.ToArray())));
             info.Add(new KeyValuePair<string, string>("Отпечаток ПК",
@@ -132,6 +132,7 @@ namespace OneCLicenseInspector.Ui
                 _ring.Text = "Утилита лицензирования 1С (ring) не найдена." + Environment.NewLine +
                     (string.IsNullOrEmpty(r.JavaPath) ? "Java не найдена." : "Java есть: " + r.JavaPath) + Environment.NewLine +
                     "Если она установлена, программа покажет список лицензий с PIN, редакцией и числом мест автоматически." + Environment.NewLine +
+                    "Содержимое *.lic зашифровано — PIN и редакцию показывает только ring." + Environment.NewLine +
                     "Утилита входит в комплект «1C:Enterprise License Tools» и требует Java.";
             }
 
