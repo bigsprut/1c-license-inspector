@@ -266,6 +266,11 @@ namespace OneCLicenseInspector.Ui
                 MessageBox.Show("Скопируйте таблицу сеансов в консоли администрирования 1С 8.2 (выделить → Ctrl+C) и нажмите кнопку снова.");
                 return;
             }
+            if (Console82Import.LooksLikeProcesses(text))
+            {
+                ImportProcesses82(text);
+                return;
+            }
             List<Console82Import.Row> parsed = Console82Import.Parse(text);
             if (parsed.Count == 0)
             {
@@ -304,6 +309,46 @@ namespace OneCLicenseInspector.Ui
             _sessions.DataSource = null;
             _sessions.DataSource = rows;
             _sessHint.Text = "Импорт из консоли 8.2: " + Console82Import.Summary(parsed);
+            if (rows.Count > 0) _sessions.Rows[0].Selected = true;
+            ShowSessionDetails();
+        }
+        private void ImportProcesses82(string text)
+        {
+            List<Console82Import.ProcRow> parsed = Console82Import.ParseProcesses(text);
+            if (parsed.Count == 0)
+            {
+                MessageBox.Show("В буфере нет таблицы рабочих процессов 1С 8.2.");
+                return;
+            }
+            if (_result == null) return;
+            _result.Cluster.Sessions.Clear();
+            List<SessionRow> rows = new List<SessionRow>();
+            foreach (Console82Import.ProcRow pr in parsed)
+            {
+                SessionRow row = new SessionRow();
+                row.User = pr.Computer;
+                row.Host = ":" + pr.Port;
+                row.AppId = pr.Usage;
+                row.StartedAt = pr.Enabled + " / " + pr.Active;
+                row.License = string.IsNullOrEmpty(pr.License) ? "—" : pr.License;
+                row.Seats = pr.Pid;
+                rows.Add(row);
+
+                SessionEntry se = new SessionEntry();
+                se.User = pr.Computer;
+                se.Host = ":" + pr.Port;
+                se.AppId = pr.Usage;
+                se.LicenseShort = pr.License;
+                _result.Cluster.Sessions.Add(se);
+            }
+            _result.Cluster.Available = true;
+            _result.Cluster.Error = "";
+            _result.Cluster.Endpoint = "консоль 8.2 (процессы)";
+            _sessionItems = _result.Cluster.Sessions;
+
+            _sessions.DataSource = null;
+            _sessions.DataSource = rows;
+            _sessHint.Text = "Импорт процессов 8.2: " + Console82Import.ProcessSummary(parsed);
             if (rows.Count > 0) _sessions.Rows[0].Selected = true;
             ShowSessionDetails();
         }

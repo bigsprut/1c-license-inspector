@@ -89,6 +89,105 @@ namespace OneCLicenseInspector
             return comma > 0 ? license.Substring(0, comma).Trim() : license.Trim();
         }
 
+        public class ProcRow
+        {
+            public string Computer = "";
+            public string Port = "";
+            public string Usage = "";
+            public string Enabled = "";
+            public string Active = "";
+            public string Pid = "";
+            public string Memory = "";
+            public string License = "";
+        }
+
+        public static bool LooksLikeProcesses(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+            return text.IndexOf("Порт", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                   text.IndexOf("PID", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                   text.IndexOf("Лицензия", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                   text.IndexOf("Номер сеанса", StringComparison.OrdinalIgnoreCase) < 0;
+        }
+
+        public static List<ProcRow> ParseProcesses(string text)
+        {
+            List<ProcRow> rows = new List<ProcRow>();
+            if (string.IsNullOrEmpty(text)) return rows;
+            string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            string[] header = null;
+            int iComp = 0, iPort = 1, iUse = 2, iOn = 3, iAct = 4, iPid = 5, iMem = 6, iLic = -1;
+            foreach (string raw in lines)
+            {
+                if (raw == null) continue;
+                string line = raw.TrimEnd();
+                if (line.Length == 0) continue;
+                string[] c = line.Split('\t');
+                if (c.Length < 4) continue;
+                if (line.IndexOf("Порт", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                    line.IndexOf("Лицензия", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    header = c;
+                    for (int i = 0; i < header.Length; i++)
+                    {
+                        string h = header[i].Trim().ToLowerInvariant();
+                        if (h.StartsWith("компьютер")) iComp = i;
+                        else if (h.StartsWith("порт")) iPort = i;
+                        else if (h.StartsWith("использ")) iUse = i;
+                        else if (h.StartsWith("включ")) iOn = i;
+                        else if (h.StartsWith("актив")) iAct = i;
+                        else if (h.StartsWith("pid")) iPid = i;
+                        else if (h.StartsWith("память")) iMem = i;
+                        else if (h.StartsWith("лицензия")) iLic = i;
+                    }
+                    continue;
+                }
+                if (header == null) continue;
+                ProcRow r = new ProcRow();
+                r.Computer = Cell(c, iComp);
+                r.Port = Cell(c, iPort);
+                r.Usage = Cell(c, iUse);
+                r.Enabled = Cell(c, iOn);
+                r.Active = Cell(c, iAct);
+                r.Pid = Cell(c, iPid);
+                r.Memory = Cell(c, iMem);
+                r.License = iLic >= 0 ? Cell(c, iLic) : Cell(c, c.Length - 1);
+                if (r.Computer.Length == 0 && r.Port.Length == 0) continue;
+                rows.Add(r);
+            }
+            return rows;
+        }
+
+        public static string ProcessSummary(List<ProcRow> rows)
+        {
+            int withLicense = 0;
+            Dictionary<string, int> kinds = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, int> pins = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (ProcRow r in rows)
+            {
+                if (string.IsNullOrEmpty(r.License)) continue;
+                withLicense++;
+                string kind = LicenseKind(r.License);
+                int n;
+                kinds.TryGetValue(kind, out n); kinds[kind] = n + 1;
+                string pin = LicensePin(r.License);
+                if (pin.Length > 0) { pins.TryGetValue(pin, out n); pins[pin] = n + 1; }
+            }
+            StringBuilder b = new StringBuilder();
+            b.Append("Процессов: ").Append(rows.Count).Append(", с лицензией: ").Append(withLicense);
+            foreach (KeyValuePair<string, int> kv in kinds) b.Append(" · ").Append(kv.Key).Append(": ").Append(kv.Value);
+            foreach (KeyValuePair<string, int> kv in pins) b.Append(" · PIN ").Append(kv.Key).Append(": ").Append(kv.Value);
+            return b.ToString();
+        }
+
+        public static string LicensePin(string license)
+        {
+            if (string.IsNullOrEmpty(license)) return "";
+            int comma = license.IndexOf(',');
+            string rest = comma >= 0 ? license.Substring(comma + 1).Trim() : license.Trim();
+            string[] parts = rest.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length > 0 ? parts[0] : "";
+        }
         public static string Summary(List<Row> rows)
         {
             int withLicense = 0;
