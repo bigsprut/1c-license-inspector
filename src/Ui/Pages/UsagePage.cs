@@ -153,10 +153,13 @@ namespace OneCLicenseInspector.Ui
 
             _sessions = MakeGrid();
             _sessions.Columns.Add(Col("Пользователь", "User", 100));
-            _sessions.Columns.Add(Col("Компьютер", "Host", 95));
-            _sessions.Columns.Add(Col("Приложение", "AppId", 118));
-            _sessions.Columns.Add(Col("Начало", "StartedAt", 150));
-            _sessions.Columns.Add(Col("Лицензия", "License", 195));
+            _sessions.Columns.Add(Col("Компьютер", "Host", 90));
+            _sessions.Columns.Add(Col("Приложение", "AppId", 105));
+            _sessions.Columns.Add(Col("Начало", "StartedAt", 140));
+            _sessions.Columns.Add(Col("Лицензия", "License", 80));
+            _sessions.Columns.Add(Col("PIN", "Pin", 110));
+            _sessions.Columns.Add(Col("Занято", "Used", 60));
+            _sessions.Columns.Add(Col("Всего", "Total", 60));
             _sessions.Columns.Add(Col("Мест", "Seats", 60));
             _sessions.Dock = DockStyle.Fill;
             _sessions.SelectionChanged += delegate { ShowSessionDetails(); };
@@ -287,7 +290,12 @@ namespace OneCLicenseInspector.Ui
                 row.Host = pr.Host;
                 row.AppId = pr.App;
                 row.StartedAt = pr.Started;
-                row.License = string.IsNullOrEmpty(pr.License) ? "—" : pr.License;
+                string lkind, lpin; int lused, ltotal;
+                Console82Import.ParseLicense(pr.License, out lkind, out lpin, out lused, out ltotal);
+                row.License = string.IsNullOrEmpty(lkind) ? "—" : lkind;
+                row.Pin = lpin;
+                row.Used = lused >= 0 ? lused.ToString() : "";
+                row.Total = ltotal >= 0 ? ltotal.ToString() : "";
                 row.Seats = "";
                 rows.Add(row);
 
@@ -340,7 +348,12 @@ namespace OneCLicenseInspector.Ui
                 row.Host = ":" + pr.Port;
                 row.AppId = pr.Usage;
                 row.StartedAt = pr.Enabled + " / " + pr.Active;
-                row.License = string.IsNullOrEmpty(pr.License) ? "—" : pr.License;
+                string lkind, lpin; int lused, ltotal;
+                Console82Import.ParseLicense(pr.License, out lkind, out lpin, out lused, out ltotal);
+                row.License = string.IsNullOrEmpty(lkind) ? "—" : lkind;
+                row.Pin = lpin;
+                row.Used = lused >= 0 ? lused.ToString() : "";
+                row.Total = ltotal >= 0 ? ltotal.ToString() : "";
                 row.Seats = pr.Pid;
                 rows.Add(row);
 
@@ -528,6 +541,9 @@ namespace OneCLicenseInspector.Ui
             public string AppId { get; set; }
             public string StartedAt { get; set; }
             public string License { get; set; }
+            public string Pin { get; set; }
+            public string Used { get; set; }
+            public string Total { get; set; }
             public string Seats { get; set; }
         }
     }
