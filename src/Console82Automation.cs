@@ -130,6 +130,7 @@ namespace OneCLicenseInspector
                 StringBuilder cls = new StringBuilder(256);
                 GetClassName(hWnd, cls, cls.Capacity);
                 if (cls.ToString() != "MMCMainFrame") return true;
+                if (!IsWindowVisible(hWnd)) return true;
                 StringBuilder title = new StringBuilder(512);
                 GetWindowText(hWnd, title, title.Capacity);
                 string t = title.ToString();
@@ -283,7 +284,7 @@ namespace OneCLicenseInspector
                 IntPtr p = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(TVITEMW)));
                 try
                 {
-                    Marshal.StructureToPtr(tv, p, false);
+                    Marshal.StructureToPtr((object)tv, p, false);
                     SendMessage(tree, TVM_GETITEMW, IntPtr.Zero, p);
                     return Marshal.PtrToStringUni(buffer) ?? "";
                 }
@@ -299,7 +300,7 @@ namespace OneCLicenseInspector
             IntPtr rectPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(RECT)));
             try
             {
-                Marshal.StructureToPtr(new RECT(), rectPtr, false);
+                Marshal.StructureToPtr((object)new RECT(), rectPtr, false);
                 SendMessage(tree, TVM_GETITEMRECT, node, rectPtr);
                 RECT r = (RECT)Marshal.PtrToStructure(rectPtr, typeof(RECT));
                 int x = Math.Max(2, (r.right - r.left) / 2);
@@ -358,7 +359,7 @@ namespace OneCLicenseInspector
                 c.pszText = buffer;
                 c.cchTextMax = 512;
                 c.iSubItem = index;
-                Marshal.StructureToPtr(c, p, false);
+                Marshal.StructureToPtr((object)c, p, false);
                 SendMessage(list, LVM_GETCOLUMNW, (IntPtr)index, p);
                 Marshal.PtrToStructure(p, typeof(LVCOLUMNW));
                 return Marshal.PtrToStringUni(buffer) ?? "";
@@ -402,7 +403,7 @@ namespace OneCLicenseInspector
                 item.iSubItem = col;
                 item.pszText = buffer;
                 item.cchTextMax = 1000;
-                Marshal.StructureToPtr(item, p, false);
+                Marshal.StructureToPtr((object)item, p, false);
                 SendMessage(list, LVM_GETITEMTEXTW, (IntPtr)row, p);
                 return Marshal.PtrToStringUni(buffer) ?? "";
             }

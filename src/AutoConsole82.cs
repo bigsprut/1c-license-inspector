@@ -22,6 +22,14 @@ namespace OneCLicenseInspector
             return "";
         }
 
+        private static int CountLines(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return 0;
+            int n = 0;
+            foreach (char c in text) if (c == '\n') n++;
+            return n;
+        }
+
         public static bool TryAutoCollect(ScanResult r)
         {
             try
@@ -41,6 +49,40 @@ namespace OneCLicenseInspector
                 string errProc, errSess;
                 string procTsv = Mmc20Reader.ReadTable(msc, "Рабочие процессы", out errProc);
                 string sessTsv = Mmc20Reader.ReadTable(msc, "Сеансы", out errSess);
+
+                if (CountLines(sessTsv) <= 1)
+                {
+                    try
+                    {
+                        if (Console82Automation.FindConsole() == IntPtr.Zero)
+                        {
+                            System.Diagnostics.Process.Start("mmc.exe", "\"" + msc + "\"");
+                            System.Threading.Thread.Sleep(7000);
+                        }
+                    }
+                    catch { }
+                    string ui = null, uiErr = "";
+                    string clipErr;
+                    string clip = Console82Automation.CopyTable(out clipErr);
+                    if (CountLines(clip) > 1 && !Console82Import.LooksLikeProcesses(clip))
+                    {
+                        ui = clip;
+                        r.AddLog(LogLevel.Info, "Консоль 8.2", "сеансы взяты из окна (Ctrl+C)");
+                    }
+                    else
+                    {
+                        ui = Console82Automation.ReadTable("Сеансы", out uiErr);
+                    }
+                    if (CountLines(ui) > 1)
+                    {
+                        sessTsv = ui;
+                        r.AddLog(LogLevel.Info, "Консоль 8.2", "сеансы прочитаны из окна MMC");
+                    }
+                    else if (!string.IsNullOrEmpty(uiErr))
+                    {
+                        r.AddLog(LogLevel.Info, "Консоль 8.2", "окно MMC: " + uiErr);
+                    }
+                }
 
                 bool ok = false;
                 string summary;
