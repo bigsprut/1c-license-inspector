@@ -44,7 +44,7 @@ namespace OneCLicenseInspector
                 Thread.Sleep(900);
 
                 string text = null;
-                for (int attempt = 1; attempt <= 3; attempt++)
+                for (int attempt = 1; attempt <= 4; attempt++)
                 {
                     try { if (File.Exists(outFile)) File.Delete(outFile); } catch { }
                     Call(view, "ExportList", outFile, 3);
@@ -62,9 +62,16 @@ namespace OneCLicenseInspector
                     if (lines > 1) break;
 
                     try { view.GetType().InvokeMember("ActiveScopeNode", BindingFlags.SetProperty, null, view, new object[] { found }); } catch { }
-                    Thread.Sleep(1500);
+                    Thread.Sleep(2000);
                 }
 
+                try
+                {
+                    string diag = Path.Combine(Path.GetTempPath(), nodeName.IndexOf("Сеанс", StringComparison.OrdinalIgnoreCase) >= 0
+                        ? "sessions-export.txt" : "processes-export.txt");
+                    File.WriteAllText(diag, text ?? "", Encoding.UTF8);
+                }
+                catch { }
                 if (string.IsNullOrEmpty(text))
                 {
                     error = "ExportList не вернул данные";
