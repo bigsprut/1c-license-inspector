@@ -69,6 +69,13 @@ try {
     if ($exit -ne 0) { throw ('Сборка не удалась, код ' + $exit) }
     if (-not (Test-Path $exeRel)) { throw 'Компилятор не создал exe.' }
 
+    # 32-битный помощник для консоли 1С 8.2 (MMC 2.0)
+    $helperRel = 'tools\Mmc20Dump.cs'
+    if (Test-Path $helperRel) {
+        & $csc /nologo /target:exe /platform:x86 /out:build\Mmc20Dump.exe $helperRel
+        if ($LASTEXITCODE -ne 0) { throw 'Не удалось собрать Mmc20Dump.exe' }
+    }
+
     $info = Get-Item $exeRel
     Write-Host ('Готово: ' + $info.FullName + '  (' + [Math]::Round($info.Length / 1KB) + ' КБ)')
 }

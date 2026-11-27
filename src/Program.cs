@@ -109,7 +109,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.4.1";
+        public const string Version = "1.4.2";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -167,6 +167,18 @@ namespace OneCLicenseInspector
                 DebugLog = Has(args, "/debug");
                 Boot("text rendering ok");
 
+                string mmc20 = Arg(args, "/mmc20");
+                if (!string.IsNullOrEmpty(mmc20))
+                {
+                    string node = Arg(args, "/mmcnode");
+                    if (string.IsNullOrEmpty(node)) node = "Рабочие процессы";
+                    string mmcError;
+                    string table = Mmc20Reader.ReadTable(mmc20, node, out mmcError);
+                    string mmcOut = Arg(args, "/mmcout");
+                    string dump = table != null ? table : ("ERROR: " + mmcError);
+                    if (!string.IsNullOrEmpty(mmcOut)) File.WriteAllText(mmcOut, dump, Encoding.UTF8);
+                    return 0;
+                }
                 string imp82 = Arg(args, "/imp82");
                 if (!string.IsNullOrEmpty(imp82))
                 {

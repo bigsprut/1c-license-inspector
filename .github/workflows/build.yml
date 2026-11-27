@@ -1,4 +1,4 @@
-name: build-and-release
+﻿name: build-and-release
 
 on:
   push:
@@ -34,7 +34,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: 1C-License-Inspector
-          path: build/1C-License-Inspector.exe
+          path: |
+            build/1C-License-Inspector.exe
+            build/Mmc20Dump.exe
           if-no-files-found: error
 
       - name: Publish release
@@ -46,9 +48,9 @@ jobs:
           $tag = "${{ github.ref_name }}"
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag build/1C-License-Inspector.exe `
+            gh release create $tag build/1C-License-Inspector.exe build/Mmc20Dump.exe `
               --title "1C License Inspector $tag" `
               --notes "Automated build for $tag"
           } else {
-            gh release upload $tag build/1C-License-Inspector.exe --clobber
+            gh release upload $tag build/1C-License-Inspector.exe build/Mmc20Dump.exe --clobber
           }

@@ -290,27 +290,47 @@ namespace OneCLicenseInspector.Ui
             BindSessions();
         }
 
+        private static string FindMscPath()
+        {
+            string[] probes = new string[]
+            {
+                Path.Combine(Paths.ProgramFilesX86, "1cv82", "common", "1CV8 Servers.msc"),
+                Path.Combine(Paths.ProgramFiles, "1cv82", "common", "1CV8 Servers (x86-64).msc"),
+                Path.Combine(Paths.ProgramFiles, "1cv82", "common", "1CV8 Servers.msc"),
+                Path.Combine(Paths.ProgramFilesX86, "1cv82", "common", "1CV8 Servers (x86-64).msc")
+            };
+            foreach (string msc in probes) if (File.Exists(msc)) return msc;
+            return "";
+        }
+
         private void AutoCollect82()
         {
-            if (Console82Automation.FindConsole() == IntPtr.Zero)
+            string msc = FindMscPath();
+            string errProc = "", errSess = "";
+            string procTsv = null, sessTsv = null;
+
+            if (msc.Length > 0)
             {
-                OpenConsole82();
-                MessageBox.Show("Консоль открывается. Когда она загрузится, нажмите «Собрать авто» ещё раз.");
-                return;
+                procTsv = Mmc20Reader.ReadTable(msc, "Рабочие процессы", out errProc);
+                if (procTsv == null) procTsv = Mmc20Reader.ReadTable(msc, "Working processes", out errProc);
+                sessTsv = Mmc20Reader.ReadTable(msc, "Сеансы", out errSess);
+                if (sessTsv == null) sessTsv = Mmc20Reader.ReadTable(msc, "Sessions", out errSess);
+            }
+            else
+            {
+                errProc = "оснастка 1CV8 Servers.msc не найдена";
             }
 
-            string errProc, errSess;
-            string procTsv = Console82Automation.ReadTable("Рабочие процессы", out errProc);
-            string sessTsv = Console82Automation.ReadTable("Сеансы", out errSess);
+            Diag.Log("auto82(MMC20): proc=" + (procTsv != null ? "ok" : "null") + " (" + errProc + "), sess=" + (sessTsv != null ? "ok" : "null") + " (" + errSess + ")");
 
-            Diag.Log("auto82: proc=" + (procTsv != null ? "ok" : "null") + " (" + errProc + "), sess=" + (sessTsv != null ? "ok" : "null") + " (" + errSess + ")");
             string s1 = "", s2 = "";
             if (!string.IsNullOrEmpty(procTsv)) Console82Apply.TryApply(_result, procTsv, out s1);
             if (!string.IsNullOrEmpty(sessTsv)) Console82Apply.TryApply(_result, sessTsv, out s2);
 
-            if (string.IsNullOrEmpty(procTsv) && string.IsNullOrEmpty(sessTsv))
+            if (string.IsNullOrEmpty(s1) && string.IsNullOrEmpty(s2))
             {
-                // Откат: забрать через Ctrl+C
+                // Откат: окно консоли + Ctrl+C
+                if (Console82Automation.FindConsole() == IntPtr.Zero) OpenConsole82();
                 string err;
                 string clip = Console82Automation.CopyTable(out err);
                 if (!string.IsNullOrEmpty(clip) && Console82Apply.TryApply(_result, clip, out s1))
@@ -319,15 +339,16 @@ namespace OneCLicenseInspector.Ui
                     _sessHint.Text = "Взято из консоли 8.2: " + s1;
                     return;
                 }
-                MessageBox.Show("Не удалось прочитать консоль.\r\nРабочие процессы: " + errProc +
-                                "\r\nСеансы: " + errSess + "\r\nБуфер: " + err);
+                MessageBox.Show("Не удалось прочитать консоль через MMC 2.0.\r\nПроцессы: " + errProc +
+                                "\r\nСеансы: " + errSess + "\r\nОкно/буфер: " + err);
                 return;
             }
 
             BindSessions();
-            _sessHint.Text = "Автосбор: " + (s1.Length > 0 ? "серверные — " + s1 : "серверные — нет данных") +
+            _sessHint.Text = "Автосбор (MMC 2.0): " + (s1.Length > 0 ? "серверные — " + s1 : "серверные — нет данных") +
                              " · " + (s2.Length > 0 ? "клиентские — " + s2 : "клиентские — нет данных");
         }
+
         private void GrabFromConsole()
         {
             string error;
