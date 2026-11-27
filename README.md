@@ -1,5 +1,7 @@
 # 1C License Inspector · Инспектор лицензий 1С
 
+[![build](https://github.com/bigsprut/1c-license-inspector/actions/workflows/build.yml/badge.svg)](https://github.com/bigsprut/1c-license-inspector/actions/workflows/build.yml)
+
 Неофициальная утилита для Windows, которая показывает, какие **лицензии 1С:Предприятие**
 используются и доступны на компьютере: платформы, аппаратные ключи HASP/Sentinel,
 программные лицензии и текущую нагрузку.
@@ -24,7 +26,7 @@
 
 ## Скачать
 
-Текущая версия: **1.1.0** — добавлены сеансы с лицензиями (`rac`) и работа с HASPInfo/HASP Monitor.
+Последний релиз: [страница Releases](https://github.com/bigsprut/1c-license-inspector/releases/latest). Каждый тег `v*` собирается автоматически в GitHub Actions.
 
 Готовый файл: [`dist/1C-License-Inspector.exe`](dist/1C-License-Inspector.exe) — без установки.
 

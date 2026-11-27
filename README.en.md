@@ -1,5 +1,7 @@
 # 1C License Inspector
 
+[![build](https://github.com/bigsprut/1c-license-inspector/actions/workflows/build.yml/badge.svg)](https://github.com/bigsprut/1c-license-inspector/actions/workflows/build.yml)
+
 **Author:** PrS · <bigsprut@mail.ru>
 
 An unofficial Windows utility that audits **1C:Enterprise** licenses on a single machine:
@@ -29,7 +31,7 @@ and Windows 7/8/10/11.
 
 ## Download
 
-Latest release: [v1.1.0](https://github.com/bigsprut/1c-license-inspector/releases/latest) —
+Latest release: [Releases page](https://github.com/bigsprut/1c-license-inspector/releases/latest) —
 `1C-License-Inspector.exe`, no installer.
 
 | System | Requirement |
