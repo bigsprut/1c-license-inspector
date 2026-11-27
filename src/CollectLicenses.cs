@@ -253,6 +253,11 @@ namespace OneCLicenseInspector
             string v = end < 0 ? text.Substring(colon + 1) : text.Substring(colon + 1, end - colon - 1);
             return v.Trim().Trim('\r', ' ');
         }
+        public static string ReadText(string path)
+        {
+            try { return DecodeText(File.ReadAllBytes(path)); } catch { return ""; }
+        }
+
         public static LicenseFileInfo ParseFile(string path)
         {
             return ReadLicenseFile(path);

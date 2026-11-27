@@ -44,7 +44,7 @@ namespace OneCLicenseInspector.Ui
             _hex.ForeColor = Theme.InkSoft;
             _hex.Font = Theme.MonoFont(8.5f);
             _hex.Dock = DockStyle.Fill;
-            _hexCard = WithTitle("Первые байты файла (диагностика формата)", Card(_hex, new Padding(10)));
+            _hexCard = WithTitle("Содержимое файла лицензии — можно выделить и скопировать (Ctrl+C)", Card(_hex, new Padding(10)));
             AddRow(_hexCard, 140);
             AddSpacer(6);
 
@@ -228,7 +228,7 @@ namespace OneCLicenseInspector.Ui
             kv.Add(new KeyValuePair<string, string>("Формат", f.Format + " · " + f.Note));
             kv.Add(new KeyValuePair<string, string>("SHA-1", f.Sha1));
             _info.Set(kv);
-            _hex.Text = f.Preview;
+            _hex.Text = CollectLicenses.ReadText(f.FullPath);
         }
 
         public class FileRow

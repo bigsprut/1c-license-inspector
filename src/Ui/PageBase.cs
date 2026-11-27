@@ -2,15 +2,69 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Text;
 
 namespace OneCLicenseInspector.Ui
 {
     internal class PageBase : BufferedPanel
     {
+        protected ScanResult Snapshot;
         protected TableLayoutPanel Root;
         protected int _row;
         private int _totalHeight;
 
+        public void SetSnapshot(ScanResult r) { Snapshot = r; }
+
+        /// <summary>Текст текущей страницы для копирования в буфер (Ctrl+C).</summary>
+        public virtual string CopyText() { return BuildSummary(); }
+
+        protected string BuildSummary()
+        {
+            ScanResult r = Snapshot;
+            if (r == null) return "";
+            StringBuilder b = new StringBuilder();
+            b.AppendLine("Инспектор лицензий 1С " + Program.Version);
+            b.AppendLine("Компьютер: " + r.System.ComputerName + " · " + r.System.OsCaption + " " + r.System.OsArch);
+            b.AppendLine("Проверка: " + Fmt.Date(r.Finished));
+            b.AppendLine();
+            b.AppendLine("Платформы 1С (" + r.Platforms.Count + "):");
+            foreach (PlatformInfo p in r.Platforms)
+                b.AppendLine("  " + p.Version + "  " + p.Bitness + "  " + p.BinPath);
+            b.AppendLine();
+            b.AppendLine("Аппаратные ключи (" + r.Sentinel.Keys.Count + "):");
+            foreach (SentinelKey k in r.Sentinel.Keys)
+                b.AppendLine("  " + k.Id + "  " + k.TypeName + "  " + k.Name + "  прошивка " + k.Firmware);
+            foreach (SentinelFeature f in r.Sentinel.Features)
+                b.AppendLine("  компонент " + f.FeatureId + " " + f.Name + ": занято " + f.Logins + " из " + (f.IsUnlimited ? "∞" : f.Limit));
+            if (r.Hasp4.UsbKeys.Count > 0)
+                b.AppendLine("  USB: " + string.Join("; ", r.Hasp4.UsbKeys.ToArray()));
+            b.AppendLine();
+            b.AppendLine("Программные лицензии (" + r.LicenseFiles.Count + "):");
+            int users = 0;
+            foreach (LicenseFileInfo lf in r.LicenseFiles)
+            {
+                users += lf.UsersNum;
+                b.AppendLine("  " + lf.FileName + " · PIN " + lf.Pin + " · " + lf.Product + " · " + lf.LicenseType +
+                             " · пользователей: " + lf.Users + " · " + lf.Expires) ;
+                b.AppendLine("    привязка: " + lf.BoundTo);
+            }
+            b.AppendLine("  Итого пользователей: " + users);
+            b.AppendLine();
+            if (r.Cluster != null)
+            {
+                b.AppendLine("Сеансы (" + r.Cluster.Sessions.Count + "):");
+                foreach (SessionEntry s in r.Cluster.Sessions)
+                    b.AppendLine("  " + s.User + " · " + s.Host + " · " + s.AppId + " · " + s.LicenseShort);
+                if (!string.IsNullOrEmpty(r.Cluster.Error)) b.AppendLine("  " + r.Cluster.Error);
+            }
+            if (r.Warnings.Count > 0)
+            {
+                b.AppendLine();
+                b.AppendLine("Предупреждения:");
+                foreach (Warning w in r.Warnings) b.AppendLine("  " + w.Title + ": " + w.Text);
+            }
+            return b.ToString();
+        }
         public PageBase()
         {
             BackColor = Theme.Canvas;
@@ -127,7 +181,8 @@ namespace OneCLicenseInspector.Ui
         {
             DataGridView g = new DataGridView();
             Theme.StyleGrid(g);
-            g.TabStop = false;
+            g.TabStop = true;
+            g.ClipboardCopyMode = DataGridViewClipboardCopyMode.EnableAlwaysIncludeHeaderText;
             return g;
         }
 

@@ -232,6 +232,9 @@ namespace OneCLicenseInspector.Ui
             }
 
             Diag.Log("ctor: before pages");
+            ContextMenuStrip copyMenu = new ContextMenuStrip();
+            copyMenu.Items.Add("Копировать страницу (Ctrl+C)", null, delegate { CopyCurrentPage(); });
+            _content.ContextMenuStrip = copyMenu;
             BuildPages();
             Diag.Log("ctor: pages done");
             ResumeLayout(true);
@@ -309,7 +312,7 @@ namespace OneCLicenseInspector.Ui
             LayoutNav();
 
             Label footer = new Label();
-            footer.Text = "Версия " + Program.Version + "  ·  .NET " + Environment.Version.Major + "." + Environment.Version.Minor;
+            footer.Text = "Версия " + Program.Version + "  ·  Ctrl+C — копировать страницу";
             footer.ForeColor = Color.FromArgb(160, 172, 184);
             footer.Font = Theme.Small;
             footer.AutoSize = false;
@@ -402,8 +405,28 @@ namespace OneCLicenseInspector.Ui
         {
             if (e.KeyCode == Keys.F5) StartScan();
             if (e.Control && e.KeyCode == Keys.E) ExportReport();
+            if (e.Control && e.KeyCode == Keys.C)
+            {
+                if (ActiveControl is TextBoxBase) return;
+                CopyCurrentPage();
+            }
         }
 
+        private void CopyCurrentPage()
+        {
+            try
+            {
+                if (_current < 0 || _current >= _pages.Count) return;
+                PageBase page = _pages[_current];
+                if (page == null) return;
+                string text = page.CopyText();
+                if (string.IsNullOrEmpty(text)) return;
+                Clipboard.SetText(text);
+                _status.LeftText = "Скопировано в буфер обмена";
+                _status.Invalidate();
+            }
+            catch (Exception ex) { Diag.Log("copy failed: " + ex.Message); }
+        }
         private void StartScan()
         {
             if (_scanning) return;
@@ -457,7 +480,7 @@ namespace OneCLicenseInspector.Ui
             _header.Subtitle = r.System.ComputerName + "  ·  " + r.System.OsCaption + "  ·  " + r.System.OsArch;
             _header.Invalidate();
 
-            foreach (PageBase p in _pages) { if (p != null) { p.Bind(r); p.ScrollTop(); } }
+            foreach (PageBase p in _pages) { if (p != null) { p.SetSnapshot(r); p.Bind(r); p.ScrollTop(); } }
             BeginInvoke(new Action(delegate { foreach (PageBase p in _pages) { if (p != null) p.ScrollTop(); } }));
 
             _status.Busy = false;
