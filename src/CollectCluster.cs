@@ -34,8 +34,6 @@ namespace OneCLicenseInspector
                 psi.RedirectStandardOutput = true;
                 psi.RedirectStandardError = true;
                 psi.WorkingDirectory = Path.GetDirectoryName(exe) ?? Environment.CurrentDirectory;
-                psi.StandardOutputEncoding = Encoding.UTF8;
-                psi.StandardErrorEncoding = Encoding.UTF8;
 
                 using (Process p = Process.Start(psi))
                 {

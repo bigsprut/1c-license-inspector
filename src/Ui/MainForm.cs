@@ -144,10 +144,13 @@ namespace OneCLicenseInspector.Ui
         public MainForm(int initialPage)
         {
             _initialPage = initialPage;
+            Diag.Log("ctor: begin");
             SuspendLayout();
             Text = "Инспектор лицензий 1С";
             BackColor = Theme.Canvas;
+            Diag.Log("ctor: colors");
             if (!Program.NoFont) Font = Theme.Body;
+            Diag.Log("ctor: font");
             AutoScaleMode = AutoScaleMode.None;
             if (!Program.NoCenter) StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(1220, 780);
@@ -162,6 +165,7 @@ namespace OneCLicenseInspector.Ui
                 catch { }
             }
 
+            Diag.Log("ctor: props done");
             if (Program.BareLevel == 0)
             {
                 ResumeLayout(true);
@@ -227,8 +231,11 @@ namespace OneCLicenseInspector.Ui
                 return;
             }
 
+            Diag.Log("ctor: before pages");
             BuildPages();
+            Diag.Log("ctor: pages done");
             ResumeLayout(true);
+            Diag.Log("ctor: layout resumed");
             KeyDown += MainFormKeyDown;
         }
 
