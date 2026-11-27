@@ -304,6 +304,16 @@ namespace OneCLicenseInspector.Ui
             _result.Cluster.Available = true;
             _result.Cluster.Error = "";
             _result.Cluster.Endpoint = "консоль 8.2";
+            string ckind, cpin; int cused, ctotal;
+            foreach (Console82Import.Row pr in parsed)
+            {
+                if (string.IsNullOrEmpty(pr.License)) continue;
+                Console82Import.ParseLicense(pr.License, out ckind, out cpin, out cused, out ctotal);
+                _result.Cluster.ImportedClientPin = cpin;
+                _result.Cluster.ImportedClientUsed = cused;
+                _result.Cluster.ImportedClientTotal = ctotal;
+                break;
+            }
             _sessionItems = _result.Cluster.Sessions;
 
             _sessions.DataSource = null;
@@ -344,6 +354,16 @@ namespace OneCLicenseInspector.Ui
             _result.Cluster.Available = true;
             _result.Cluster.Error = "";
             _result.Cluster.Endpoint = "консоль 8.2 (процессы)";
+            string skind, spin; int sused, stotal;
+            foreach (Console82Import.ProcRow pr in parsed)
+            {
+                if (string.IsNullOrEmpty(pr.License)) continue;
+                Console82Import.ParseLicense(pr.License, out skind, out spin, out sused, out stotal);
+                _result.Cluster.ImportedServerPin = spin;
+                _result.Cluster.ImportedServerUsed = sused;
+                _result.Cluster.ImportedServerTotal = stotal;
+                break;
+            }
             _sessionItems = _result.Cluster.Sessions;
 
             _sessions.DataSource = null;

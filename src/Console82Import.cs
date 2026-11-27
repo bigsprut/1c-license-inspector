@@ -82,6 +82,34 @@ namespace OneCLicenseInspector
             return cells[index].Trim();
         }
 
+        public static void ParseLicense(string license, out string kind, out string pin, out int used, out int total)
+        {
+            kind = ""; pin = ""; used = -1; total = -1;
+            if (string.IsNullOrEmpty(license)) return;
+            int comma = license.IndexOf(',');
+            if (comma >= 0)
+            {
+                kind = license.Substring(0, comma).Trim();
+                string rest = license.Substring(comma + 1).Trim();
+                string[] parts = rest.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0) pin = parts[0];
+                if (parts.Length > 1) int.TryParse(parts[1], out used);
+                if (parts.Length > 2) int.TryParse(parts[2], out total);
+            }
+            else
+            {
+                kind = license.Trim();
+            }
+        }
+
+        public static string LicenseUsageText(string license)
+        {
+            string kind, pin; int used, total;
+            ParseLicense(license, out kind, out pin, out used, out total);
+            if (used >= 0 && total >= 0) return kind + ", PIN " + pin + ": занято " + used + " из " + total;
+            if (pin.Length > 0) return kind + ", PIN " + pin;
+            return kind;
+        }
         public static string LicenseKind(string license)
         {
             if (string.IsNullOrEmpty(license)) return "";
@@ -174,7 +202,13 @@ namespace OneCLicenseInspector
                 if (pin.Length > 0) { pins.TryGetValue(pin, out n); pins[pin] = n + 1; }
             }
             StringBuilder b = new StringBuilder();
-            b.Append("Процессов: ").Append(rows.Count).Append(", с лицензией: ").Append(withLicense);
+            b.Append("Процессов (серверные): ").Append(rows.Count).Append(", с лицензией: ").Append(withLicense);
+            foreach (ProcRow row in rows)
+            {
+                if (string.IsNullOrEmpty(row.License)) continue;
+                b.Append(" · ").Append(LicenseUsageText(row.License));
+                break;
+            }
             foreach (KeyValuePair<string, int> kv in kinds) b.Append(" · ").Append(kv.Key).Append(": ").Append(kv.Value);
             foreach (KeyValuePair<string, int> kv in pins) b.Append(" · PIN ").Append(kv.Key).Append(": ").Append(kv.Value);
             return b.ToString();
@@ -203,7 +237,13 @@ namespace OneCLicenseInspector
                 kinds[kind] = n + 1;
             }
             StringBuilder b = new StringBuilder();
-            b.Append("Сеансов: ").Append(rows.Count).Append(", с лицензией: ").Append(withLicense);
+            b.Append("Сеансов (клиентские): ").Append(rows.Count).Append(", с лицензией: ").Append(withLicense);
+            foreach (Row row in rows)
+            {
+                if (string.IsNullOrEmpty(row.License)) continue;
+                b.Append(" · ").Append(LicenseUsageText(row.License));
+                break;
+            }
             foreach (KeyValuePair<string, int> kv in kinds)
                 b.Append(" · ").Append(kv.Key).Append(": ").Append(kv.Value);
             return b.ToString();

@@ -335,6 +335,12 @@ namespace OneCLicenseInspector
         public string RacPath = "";
         public string RasPath = "";
         public bool RasStartedByUs;
+        public int ImportedClientUsed = -1;
+        public int ImportedClientTotal = -1;
+        public string ImportedClientPin = "";
+        public int ImportedServerUsed = -1;
+        public int ImportedServerTotal = -1;
+        public string ImportedServerPin = "";
         public string Error = "";
         public string Note = "";
         public List<ClusterEntry> Clusters = new List<ClusterEntry>();

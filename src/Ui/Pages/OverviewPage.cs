@@ -114,7 +114,14 @@ namespace OneCLicenseInspector.Ui
             }
 
             int total = r.TotalSeats();            int free = r.TotalFreeSeats();
-            if (clUsed >= 0 && clTotal > 0)
+            if (r.Cluster != null && r.Cluster.ImportedClientTotal > 0)
+            {
+                int used = r.Cluster.ImportedClientUsed >= 0 ? r.Cluster.ImportedClientUsed : clUsed;
+                _cSeats.Value = Math.Max(0, r.Cluster.ImportedClientTotal - used) + " из " + r.Cluster.ImportedClientTotal;
+                _cSeats.Hint = "клиентских свободно (занято " + used + ", консоль 8.2)";
+                _cSeats.Accent = r.Cluster.ImportedClientTotal - used <= 0 ? Theme.Red : Theme.Green;
+            }
+            else if (clUsed >= 0 && clTotal > 0)
             {
                 _cSeats.Value = Math.Max(0, clTotal - clUsed) + " из " + clTotal;
                 _cSeats.Hint = "клиентских свободно (занято " + clUsed + ")";
