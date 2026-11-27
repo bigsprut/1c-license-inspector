@@ -193,8 +193,9 @@ namespace OneCLicenseInspector.Ui
             _procs.Columns.Add(Col("Память, KB", "Memory", 85));
             _procs.Columns.Add(Col("Лицензия", "License", 80));
             _procs.Columns.Add(Col("PIN", "Pin", 110));
-            _procs.Columns.Add(Col("Мест", "Used", 60));
-            _procs.Columns.Add(Col("Свободно", "Total", 60));
+            _procs.Columns.Add(Col("Мест", "Seats", 60));
+            _procs.Columns.Add(Col("Занято", "Used", 60));
+            _procs.Columns.Add(Col("Свободно", "Free", 60));
             _procs.Dock = DockStyle.Top;
             _procs.Height = 150;
 
@@ -207,8 +208,9 @@ namespace OneCLicenseInspector.Ui
             _sessions.Columns.Add(Col("Приложение", "AppId", 110));
             _sessions.Columns.Add(Col("Лицензия", "License", 80));
             _sessions.Columns.Add(Col("PIN", "Pin", 110));
-            _sessions.Columns.Add(Col("Мест", "Used", 60));
-            _sessions.Columns.Add(Col("Свободно", "Total", 60));
+            _sessions.Columns.Add(Col("Мест", "Seats", 60));
+            _sessions.Columns.Add(Col("Занято", "Used", 60));
+            _sessions.Columns.Add(Col("Свободно", "Free", 60));
             _sessions.Dock = DockStyle.Fill;
             _sessions.SelectionChanged += delegate { ShowSessionDetails(); };
 
@@ -446,6 +448,20 @@ namespace OneCLicenseInspector.Ui
             if (_result == null) return;
             ClusterInfo c = _result.Cluster;
 
+            Dictionary<string, int> procUse = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (SessionEntry s in c.Processes)
+            {
+                string tp, tpin, tf; int tu, tt;
+                Console82Import.ParseLicenseFull(s.LicenseShort, out tp, out tpin, out tu, out tt, out tf);
+                if (tpin.Length > 0) { int n; procUse.TryGetValue(tpin, out n); procUse[tpin] = n + 1; }
+            }
+            Dictionary<string, int> sessUse = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (SessionEntry s in c.Sessions)
+            {
+                string tp, tpin, tf; int tu, tt;
+                Console82Import.ParseLicenseFull(s.LicenseShort, out tp, out tpin, out tu, out tt, out tf);
+                if (tpin.Length > 0) { int n; sessUse.TryGetValue(tpin, out n); sessUse[tpin] = n + 1; }
+            }
             List<ProcessRow> prows = new List<ProcessRow>();
             foreach (SessionEntry s in c.Processes)
             {
@@ -461,8 +477,10 @@ namespace OneCLicenseInspector.Ui
                 Console82Import.ParseLicenseFull(s.LicenseShort, out pk, out pp, out pu, out pt, out pf);
                 pr.License = pk;
                 pr.Pin = pp;
-                pr.Used = pu >= 0 ? pu.ToString() : "";
-                pr.Total = pt >= 0 ? pt.ToString() : "";
+                int procCount; procUse.TryGetValue(pp, out procCount);
+                pr.Seats = pt >= 0 ? pt.ToString() : "";
+                pr.Used = procCount.ToString();
+                pr.Free = pt > 0 ? Math.Max(0, pt - procCount).ToString() : "";
                 prows.Add(pr);
             }
             _procs.DataSource = null;
@@ -483,8 +501,10 @@ namespace OneCLicenseInspector.Ui
                 Console82Import.ParseLicenseFull(s.LicenseShort, out licKind, out licPin, out licUsed, out licTotal, out licFile);
                 row.License = licKind.Length > 0 ? licKind : LicenseText(s);
                 row.Pin = licPin;
-                row.Used = licUsed >= 0 ? licUsed.ToString() : "";
-                row.Total = licTotal >= 0 ? licTotal.ToString() : "";
+                int sessCount; sessUse.TryGetValue(licPin, out sessCount);
+                row.Seats = licTotal >= 0 ? licTotal.ToString() : "";
+                row.Used = sessCount.ToString();
+                row.Free = licTotal > 0 ? Math.Max(0, licTotal - sessCount).ToString() : "";
                 rows.Add(row);
             }
             _sessions.DataSource = null;
@@ -634,7 +654,8 @@ namespace OneCLicenseInspector.Ui
             public string License { get; set; }
             public string Pin { get; set; }
             public string Used { get; set; }
-            public string Total { get; set; }
+            public string Seats { get; set; }
+            public string Free { get; set; }
         }
 
         public class ProcessRow
@@ -649,7 +670,8 @@ namespace OneCLicenseInspector.Ui
             public string License { get; set; }
             public string Pin { get; set; }
             public string Used { get; set; }
-            public string Total { get; set; }
+            public string Seats { get; set; }
+            public string Free { get; set; }
         }
     }
 
