@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 
 namespace OneCLicenseInspector
 {
@@ -37,23 +38,26 @@ namespace OneCLicenseInspector
 
                 using (Process p = Process.Start(psi))
                 {
-                    StringBuilder so = new StringBuilder();
-                    StringBuilder se = new StringBuilder();
-                    p.OutputDataReceived += delegate (object s, DataReceivedEventArgs e) { if (e.Data != null) so.AppendLine(e.Data); };
-                    p.ErrorDataReceived += delegate (object s, DataReceivedEventArgs e) { if (e.Data != null) se.AppendLine(e.Data); };
-                    p.BeginOutputReadLine();
-                    p.BeginErrorReadLine();
-                    if (!p.WaitForExit(timeoutMs))
-                    {
-                        try { p.Kill(); } catch { }
-                        stdout = so.ToString();
-                        stderr = se.ToString();
-                        return -2;
-                    }
-                    p.WaitForExit(500);
-                    stdout = so.ToString();
-                    stderr = se.ToString();
-                    return p.ExitCode;
+                    // Читаем сырые байты: консольные утилиты (rac, ring) пишут в OEM-кодировке,
+                    // а не в UTF-8 — иначе в журнале «кракозябры».
+                    MemoryStream soMs = new MemoryStream();
+                    MemoryStream seMs = new MemoryStream();
+                    Thread tOut = new Thread(delegate () { try { p.StandardOutput.BaseStream.CopyTo(soMs); } catch { } });
+                    Thread tErr = new Thread(delegate () { try { p.StandardError.BaseStream.CopyTo(seMs); } catch { } });
+                    tOut.IsBackground = true;
+                    tErr.IsBackground = true;
+                    tOut.Start();
+                    tErr.Start();
+
+                    bool exited = p.WaitForExit(timeoutMs);
+                    if (!exited) { try { p.Kill(); } catch { } }
+                    tOut.Join(3000);
+                    tErr.Join(3000);
+
+                    Encoding enc = OemEncoding();
+                    stdout = enc.GetString(soMs.ToArray());
+                    stderr = enc.GetString(seMs.ToArray());
+                    return exited ? p.ExitCode : -2;
                 }
             }
             catch (Exception ex)
@@ -61,6 +65,18 @@ namespace OneCLicenseInspector
                 stderr = ex.Message;
                 return -1;
             }
+        }
+
+        private static Encoding OemEncoding()
+        {
+            try
+            {
+                int cp = System.Globalization.CultureInfo.CurrentCulture.TextInfo.OEMCodePage;
+                if (cp > 0) return Encoding.GetEncoding(cp);
+            }
+            catch { }
+            try { return Encoding.GetEncoding(866); } catch { }
+            return Encoding.Default;
         }
     }
 
