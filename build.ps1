@@ -1,6 +1,9 @@
 ﻿# Сборка «Инспектор лицензий 1С» компилятором .NET Framework 4.0 (csc.exe).
 # Никаких внешних зависимостей: на выходе один exe, работающий на Windows Server 2003 x64
 # (при установленном .NET Framework 4.0) и на Windows Server 2016/2019/2022.
+#
+# Важно: все пути компилятору передаются относительными и без кавычек — иначе PowerShell 7
+# на GitHub Actions передаёт кавычки буквально, и csc падает с CS2021.
 param(
     [switch]$Quiet
 )
@@ -17,51 +20,58 @@ $cscCandidates = @(
 $csc = $cscCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $csc) { throw 'Не найден компилятор C# 4.0 (csc.exe). Установите .NET Framework 4.x.' }
 
-$icon = Join-Path $root 'res\app.ico'
-if (-not (Test-Path $icon)) {
-    & (Join-Path $root 'tools\make-icon.ps1')
+Push-Location $root
+try {
+    $iconRel = 'res\app.ico'
+    if (-not (Test-Path $iconRel)) {
+        & (Join-Path $root 'tools\make-icon.ps1') -OutPath (Join-Path $root $iconRel)
+    }
+
+    $sources = Get-ChildItem 'src' -Recurse -Filter *.cs | ForEach-Object { $_.FullName.Substring($root.Length + 1) }
+    if ($sources.Count -eq 0) { throw 'Не найдены файлы исходного кода.' }
+
+    $netDir = Split-Path -Parent $csc
+    $refs = @(
+        'System.dll',
+        'System.Core.dll',
+        'System.Drawing.dll',
+        'System.Windows.Forms.dll',
+        'System.Xml.dll',
+        'System.Xml.Linq.dll',
+        'System.Management.dll',
+        'System.ServiceProcess.dll'
+    ) | ForEach-Object { Join-Path $netDir $_ }
+
+    Get-Process '1C-License-Inspector' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 600
+
+    $exeRel = 'build\1C-License-Inspector.exe'
+    if (Test-Path $exeRel) { Remove-Item $exeRel -Force }
+
+    $cscArgs = @(
+        '/nologo',
+        '/target:winexe',
+        '/platform:anycpu',
+        '/optimize+',
+        '/codepage:65001',
+        '/warn:4',
+        ('/out:' + $exeRel),
+        '/win32manifest:res\app.manifest'
+    )
+    if (Test-Path $iconRel) { $cscArgs += ('/win32icon:' + $iconRel) }
+    foreach ($r in $refs) { $cscArgs += ('/reference:' + $r) }
+    $cscArgs += $sources
+
+    $log = & $csc $cscArgs 2>&1
+    $exit = $LASTEXITCODE
+    if (-not $Quiet -or $exit -ne 0) { $log | ForEach-Object { Write-Host $_ } }
+
+    if ($exit -ne 0) { throw ('Сборка не удалась, код ' + $exit) }
+    if (-not (Test-Path $exeRel)) { throw 'Компилятор не создал exe.' }
+
+    $info = Get-Item $exeRel
+    Write-Host ('Готово: ' + $info.FullName + '  (' + [Math]::Round($info.Length / 1KB) + ' КБ)')
 }
-
-$sources = Get-ChildItem (Join-Path $root 'src') -Recurse -Filter *.cs | ForEach-Object { $_.FullName }
-if ($sources.Count -eq 0) { throw 'Не найдены файлы исходного кода.' }
-
-$netDir = Split-Path -Parent $csc
-$refs = @(
-    'System.dll',
-    'System.Core.dll',
-    'System.Drawing.dll',
-    'System.Windows.Forms.dll',
-    'System.Xml.dll',
-    'System.Xml.Linq.dll',
-    'System.Management.dll',
-    'System.ServiceProcess.dll'
-) | ForEach-Object { Join-Path $netDir $_ }
-
-$exe = Join-Path $outDir '1C-License-Inspector.exe'
-$args = @(
-    '/nologo',
-    '/target:winexe',
-    '/platform:anycpu',
-    '/optimize+',
-    '/codepage:65001',
-    '/warn:4',
-    ('/out:"' + $exe + '"'),
-    ('/win32manifest:"' + (Join-Path $root 'res\app.manifest') + '"')
-)
-if (Test-Path $icon) { $args += ('/win32icon:"' + $icon + '"') }
-foreach ($r in $refs) { $args += ('/reference:"' + $r + '"') }
-$args += $sources
-
-Get-Process '1C-License-Inspector' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Milliseconds 600
-if (Test-Path $exe) { Remove-Item $exe -Force }
-
-$log = & $csc $args 2>&1
-$exit = $LASTEXITCODE
-if (-not $Quiet -or $exit -ne 0) { $log | ForEach-Object { Write-Host $_ } }
-
-if ($exit -ne 0) { throw ('Сборка не удалась, код ' + $exit) }
-if (-not (Test-Path $exe)) { throw 'Компилятор не создал exe.' }
-
-$info = Get-Item $exe
-Write-Host ('Готово: ' + $info.FullName + '  (' + [Math]::Round($info.Length / 1KB) + ' КБ)')
+finally {
+    Pop-Location
+}
