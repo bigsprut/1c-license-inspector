@@ -193,8 +193,8 @@ namespace OneCLicenseInspector.Ui
             _procs.Columns.Add(Col("Память, KB", "Memory", 85));
             _procs.Columns.Add(Col("Лицензия", "License", 80));
             _procs.Columns.Add(Col("PIN", "Pin", 110));
-            _procs.Columns.Add(Col("Занято", "Used", 60));
-            _procs.Columns.Add(Col("Всего", "Total", 60));
+            _procs.Columns.Add(Col("Мест", "Used", 60));
+            _procs.Columns.Add(Col("Свободно", "Total", 60));
             _procs.Dock = DockStyle.Top;
             _procs.Height = 150;
 
@@ -207,8 +207,8 @@ namespace OneCLicenseInspector.Ui
             _sessions.Columns.Add(Col("Приложение", "AppId", 110));
             _sessions.Columns.Add(Col("Лицензия", "License", 80));
             _sessions.Columns.Add(Col("PIN", "Pin", 110));
-            _sessions.Columns.Add(Col("Занято", "Used", 60));
-            _sessions.Columns.Add(Col("Всего", "Total", 60));
+            _sessions.Columns.Add(Col("Мест", "Used", 60));
+            _sessions.Columns.Add(Col("Свободно", "Total", 60));
             _sessions.Dock = DockStyle.Fill;
             _sessions.SelectionChanged += delegate { ShowSessionDetails(); };
 
