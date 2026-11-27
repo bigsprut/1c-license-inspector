@@ -43,21 +43,34 @@ namespace OneCLicenseInspector
                 try { view.GetType().InvokeMember("ActiveScopeNode", BindingFlags.SetProperty, null, view, new object[] { found }); } catch { }
                 Thread.Sleep(900);
 
-                try { if (File.Exists(outFile)) File.Delete(outFile); } catch { }
-                Call(view, "ExportList", outFile, 3);
-                Thread.Sleep(300);
-
-                if (!File.Exists(outFile))
+                string text = null;
+                for (int attempt = 1; attempt <= 3; attempt++)
                 {
-                    error = "ExportList не создал файл";
-                    return null;
+                    try { if (File.Exists(outFile)) File.Delete(outFile); } catch { }
+                    Call(view, "ExportList", outFile, 3);
+                    Thread.Sleep(600);
+                    if (!File.Exists(outFile)) continue;
+
+                    byte[] probe = File.ReadAllBytes(outFile);
+                    text = probe.Length >= 2 && probe[0] == 0xFF && probe[1] == 0xFE
+                        ? Encoding.Unicode.GetString(probe, 2, probe.Length - 2)
+                        : Encoding.UTF8.GetString(probe);
+                    text = text.TrimStart('\uFEFF');
+                    int lines = 0;
+                    foreach (char ch in text) if (ch == '\n') lines++;
+                    Diag.Log("mmc20: " + nodeName + " попытка " + attempt + ", строк=" + lines);
+                    if (lines > 1) break;
+
+                    try { view.GetType().InvokeMember("ActiveScopeNode", BindingFlags.SetProperty, null, view, new object[] { found }); } catch { }
+                    Thread.Sleep(1500);
                 }
 
-                byte[] bytes = File.ReadAllBytes(outFile);
-                string text = bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE
-                    ? Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2)
-                    : Encoding.UTF8.GetString(bytes);
-                return text.TrimStart('\uFEFF');
+                if (string.IsNullOrEmpty(text))
+                {
+                    error = "ExportList не вернул данные";
+                    return null;
+                }
+                return text;
             }
             catch (Exception ex)
             {
