@@ -183,6 +183,7 @@ namespace OneCLicenseInspector.Ui
             EnableCopy(_sessDetails);
 
             _sessions = MakeGrid();
+            _sessions.Columns.Add(Col("Тип", "Type", 70));
             _sessions.Columns.Add(Col("Пользователь", "User", 100));
             _sessions.Columns.Add(Col("Компьютер", "Host", 90));
             _sessions.Columns.Add(Col("Приложение", "AppId", 105));
@@ -430,9 +431,26 @@ namespace OneCLicenseInspector.Ui
 
             List<SessionRow> rows = new List<SessionRow>();
             _sessionItems = c.Sessions;
+            foreach (SessionEntry s in c.Processes)
+            {
+                SessionRow row = new SessionRow();
+                row.Type = "Процесс";
+                row.User = string.IsNullOrEmpty(s.User) ? "—" : s.User;
+                row.Host = s.Host;
+                row.AppId = s.AppId;
+                string procKind, procPin; int procUsed, procTotal;
+                Console82Import.ParseLicense(s.LicenseShort, out procKind, out procPin, out procUsed, out procTotal);
+                row.License = procKind;
+                row.Pin = procPin;
+                row.Used = procUsed >= 0 ? procUsed.ToString() : "";
+                row.Total = procTotal >= 0 ? procTotal.ToString() : "";
+                row.Seats = s.SessionId;
+                rows.Add(row);
+            }
             foreach (SessionEntry s in c.Sessions)
             {
                 SessionRow row = new SessionRow();
+                row.Type = "Сеанс";
                 row.User = string.IsNullOrEmpty(s.User) ? "—" : s.User;
                 row.Host = s.Host;
                 row.AppId = s.AppId;
@@ -454,14 +472,14 @@ namespace OneCLicenseInspector.Ui
                 _sessHint.Text = "Кластер недоступен: " + c.Error +
                                  (string.IsNullOrEmpty(c.Note) ? "" : " " + c.Note);
             }
-            else if (c.Sessions.Count == 0)
+            else if (c.Sessions.Count == 0 && c.Processes.Count == 0)
             {
                 _sessHint.Text = "Кластер " + c.Endpoint + " отвечает, активных сеансов нет. Если сеанс запущен — он может быть в файловой базе (не в кластере) или в другом кластере сервера." +
                                  (string.IsNullOrEmpty(c.Error) ? "" : " " + c.Error);
             }
             else
             {
-                _sessHint.Text = "Сеансов: " + c.Sessions.Count + " · кластер " + c.Endpoint +
+                _sessHint.Text = "Процессов (серверные): " + c.Processes.Count + " · сеансов (клиентские): " + c.Sessions.Count + " · " + c.Endpoint +
                                  (string.IsNullOrEmpty(c.Error) ? "" : " · " + c.Error);
             }
 
@@ -579,6 +597,7 @@ namespace OneCLicenseInspector.Ui
 
         public class SessionRow
         {
+            public string Type { get; set; }
             public string User { get; set; }
             public string Host { get; set; }
             public string AppId { get; set; }

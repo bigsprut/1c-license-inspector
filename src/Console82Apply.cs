@@ -16,7 +16,7 @@ namespace OneCLicenseInspector
                 List<Console82Import.ProcRow> procs = Console82Import.ParseProcesses(text);
                 if (procs.Count == 0) return false;
 
-                r.Cluster.Sessions.Clear();
+                r.Cluster.Processes.Clear();
                 foreach (Console82Import.ProcRow pr in procs)
                 {
                     SessionEntry se = new SessionEntry();
@@ -25,11 +25,12 @@ namespace OneCLicenseInspector
                     se.AppId = pr.Usage;
                     se.LicenseShort = pr.License;
                     se.SessionId = pr.Pid;
-                    r.Cluster.Sessions.Add(se);
+                    r.Cluster.Processes.Add(se);
                 }
                 r.Cluster.Available = true;
                 r.Cluster.Error = "";
-                r.Cluster.Endpoint = "консоль 8.2 (процессы)";
+                if (r.Cluster.Endpoint.IndexOf("консоль", StringComparison.OrdinalIgnoreCase) < 0)
+                    r.Cluster.Endpoint = "консоль 8.2";
                 string kind, pin; int used, total;
                 foreach (Console82Import.ProcRow pr in procs)
                 {

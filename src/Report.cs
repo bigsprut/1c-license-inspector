@@ -267,6 +267,20 @@ namespace OneCLicenseInspector
             b.AppendLine("</table>");
 
             b.AppendLine("<h2>Сеансы 1С и выданные лицензии</h2>");
+            if (r.Cluster != null && r.Cluster.Processes.Count > 0)
+            {
+                b.AppendLine("<h3>Рабочие процессы — использование серверной лицензии</h3>");
+                b.AppendLine("<table><tr><th>Компьютер</th><th>Порт</th><th>PID</th><th>Лицензия</th><th>PIN</th><th>Занято</th><th>Всего</th></tr>");
+                foreach (SessionEntry ps in r.Cluster.Processes)
+                {
+                    string pk, pp; int pu, pt;
+                    Console82Import.ParseLicense(ps.LicenseShort, out pk, out pp, out pu, out pt);
+                    b.AppendLine("<tr><td><b>" + H(ps.User) + "</b></td><td>" + H(ps.Host) + "</td><td>" + H(ps.SessionId) +
+                                "</td><td>" + H(pk) + "</td><td>" + H(pp) + "</td><td>" + H(pu >= 0 ? pu.ToString() : "") +
+                                "</td><td>" + H(pt >= 0 ? pt.ToString() : "") + "</td></tr>");
+                }
+                b.AppendLine("</table>");
+            }
             if (!r.Cluster.Available)
             {
                 b.AppendLine("<p class=\"muted\">" + H(r.Cluster.Error) + "</p>");

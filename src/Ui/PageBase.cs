@@ -52,7 +52,11 @@ namespace OneCLicenseInspector.Ui
             b.AppendLine();
             if (r.Cluster != null)
             {
-                b.AppendLine("Сеансы (" + r.Cluster.Sessions.Count + "):");
+                b.AppendLine("Рабочие процессы — серверные лицензии (" + r.Cluster.Processes.Count + "):");
+            foreach (SessionEntry s in r.Cluster.Processes)
+                b.AppendLine("  " + s.User + " " + s.Host + " · PID " + s.SessionId + " · " + s.LicenseShort);
+            b.AppendLine();
+            b.AppendLine("Сеансы — клиентские лицензии (" + r.Cluster.Sessions.Count + "):");
                 foreach (SessionEntry s in r.Cluster.Sessions)
                     b.AppendLine("  " + s.User + " · " + s.Host + " · " + s.AppId + " · " + s.LicenseShort);
                 if (!string.IsNullOrEmpty(r.Cluster.Error)) b.AppendLine("  " + r.Cluster.Error);

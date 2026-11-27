@@ -345,6 +345,7 @@ namespace OneCLicenseInspector
         public string Note = "";
         public List<ClusterEntry> Clusters = new List<ClusterEntry>();
         public List<SessionEntry> Sessions = new List<SessionEntry>();
+        public List<SessionEntry> Processes = new List<SessionEntry>();
         public string Raw = "";
     }
 }
