@@ -273,7 +273,7 @@ namespace OneCLicenseInspector.Ui
             }
             else if (c.Sessions.Count == 0)
             {
-                _sessHint.Text = "Кластер " + c.Endpoint + " отвечает, активных сеансов нет." +
+                _sessHint.Text = "Кластер " + c.Endpoint + " отвечает, активных сеансов нет. Если сеанс запущен — он может быть в файловой базе (не в кластере) или в другом кластере сервера." +
                                  (string.IsNullOrEmpty(c.Error) ? "" : " " + c.Error);
             }
             else

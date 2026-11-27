@@ -13,12 +13,51 @@ namespace OneCLicenseInspector
         {
             SentinelInfo s = r.Sentinel;
             s.Endpoint = Endpoint;
+            // Состояние службы менеджера лицензий — даже если он не отвечает.
+            try
+            {
+                foreach (System.ServiceProcess.ServiceController sc in System.ServiceProcess.ServiceController.GetServices())
+                {
+                    if (string.Equals(sc.ServiceName, "hasplms", StringComparison.OrdinalIgnoreCase))
+                    {
+                        r.Sentinel.ServiceInstalled = true;
+                        r.Sentinel.ServiceRunning = sc.Status == System.ServiceProcess.ServiceControllerStatus.Running;
+                        r.Sentinel.ServiceState = sc.Status.ToString();
+                        break;
+                    }
+                }
+            }
+            catch { }
+            // Наличие физического ключа видно и без менеджера лицензий.
+            try
+            {
+                using (System.Management.ManagementObjectSearcher searcher =
+                    new System.Management.ManagementObjectSearcher("SELECT Name FROM Win32_PnPEntity WHERE Name LIKE '%HASP%' OR Name LIKE '%Sentinel%'"))
+                {
+                    bool usbHasp = false;
+                    foreach (System.Management.ManagementBaseObject o in searcher.Get())
+                    {
+                        string name = Convert.ToString(o["Name"]);
+                        if (!string.IsNullOrEmpty(name) &&
+                            (name.IndexOf("HASP", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                             name.IndexOf("Sentinel", StringComparison.OrdinalIgnoreCase) >= 0))
+                        {
+                            usbHasp = true;
+                        }
+                    }
+                    if (usbHasp) r.Hasp4.UsbKeys.Add("Sentinel HASP Key (USB)");
+                }
+            }
+            catch { }
+            foreach (string k in r.Hasp4.UsbKeys) r.AddLog(LogLevel.Info, "HASP", "USB-ключ: " + k);
+
 
             int status;
             string error;
             string lm = Http.Post(Endpoint, "<admin><license_manager><element name=\"*\"/></license_manager></admin>", 3000, out status, out error);
             if (string.IsNullOrEmpty(lm))
             {
+                if (AccFallback.TryLoad(r, "http://127.0.0.1:1947")) return;
                 s.Available = false;
                 s.Status = "нет ответа";
                 s.Error = FriendlyError(error, status);
@@ -61,6 +100,8 @@ namespace OneCLicenseInspector
             LoadKeys(r);
             LoadFeatures(r);
             LoadSessions(r);
+
+            if (s.Keys.Count == 0 && AccFallback.TryLoad(r, "http://127.0.0.1:1947")) return;
 
             if (s.Keys.Count == 0)
             {

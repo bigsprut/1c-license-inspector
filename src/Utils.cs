@@ -275,6 +275,43 @@ namespace OneCLicenseInspector
 
     public static class Http
     {
+        public static string Get(string url, int timeoutMs, out int status, out string error)
+        {
+            status = 0;
+            error = "";
+            try
+            {
+                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+                req.Method = "GET";
+                req.Proxy = null;
+                req.Timeout = timeoutMs;
+                req.ReadWriteTimeout = timeoutMs;
+                req.KeepAlive = false;
+                using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse())
+                {
+                    status = (int)resp.StatusCode;
+                    using (Stream rs = resp.GetResponseStream())
+                    using (MemoryStream ms = new MemoryStream())
+                    {
+                        byte[] buf = new byte[8192];
+                        int n;
+                        while ((n = rs.Read(buf, 0, buf.Length)) > 0) ms.Write(buf, 0, n);
+                        return Encoding.UTF8.GetString(ms.ToArray());
+                    }
+                }
+            }
+            catch (WebException we)
+            {
+                error = we.Message;
+                if (we.Response is HttpWebResponse) status = (int)((HttpWebResponse)we.Response).StatusCode;
+                return "";
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return "";
+            }
+        }
         public static string Post(string url, string body, int timeoutMs, out int status, out string error)
         {
             status = 0;

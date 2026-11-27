@@ -141,6 +141,9 @@ namespace OneCLicenseInspector
         public string LoginCount = "";
         public string SessionCount = "";
         public string DriverSummary = "";
+        public bool ServiceInstalled;
+        public bool ServiceRunning;
+        public string ServiceState = "";
         public List<SentinelKey> Keys = new List<SentinelKey>();
         public List<SentinelFeature> Features = new List<SentinelFeature>();
         public List<SentinelSession> Sessions = new List<SentinelSession>();
@@ -167,6 +170,7 @@ namespace OneCLicenseInspector
         public string ToolOutput = "";
         public string ReportedKeyId = "";
         public string ReportedKeyType = "";
+        public List<string> UsbKeys = new List<string>();
     }
 
     public class ServiceInfo
@@ -225,6 +229,7 @@ namespace OneCLicenseInspector
         public List<string> LicenseStorages = new List<string>();
         public string HostId = "";
         public string LicenseRing = "";
+        public string JavaPath = "";
         public string LicenseRingOutput = "";
         public SentinelInfo Sentinel = new SentinelInfo();
         public Hasp4Info Hasp4 = new Hasp4Info();

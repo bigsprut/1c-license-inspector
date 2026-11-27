@@ -92,6 +92,18 @@ namespace OneCLicenseInspector
             if (!r.Sentinel.Available)
             {
                 b.AppendLine("<p class=\"muted\">Менеджер лицензий Sentinel LDK не отвечает: " + H(r.Sentinel.Error) + "</p>");
+                if (r.Sentinel.ServiceInstalled)
+                {
+                    Row(b, "Служба Sentinel LDK", r.Sentinel.ServiceRunning ? "запущена, но не отвечает" : "остановлена");
+                }
+                else
+                {
+                    Row(b, "Служба Sentinel LDK", "не установлена");
+                }
+                if (r.Hasp4.UsbKeys.Count > 0)
+                {
+                    Row(b, "Физический ключ", "вставлен, но состав не прочитать без службы Sentinel LDK");
+                }
             }
             else if (r.Sentinel.Keys.Count == 0)
             {
@@ -117,6 +129,16 @@ namespace OneCLicenseInspector
                                 "</td><td>" + H(free) + "</td><td>" + H(f.ExpireText) + "</td></tr>");
                 }
                 b.AppendLine("</table>");
+            }
+
+            if (r.Hasp4.UsbKeys.Count > 0)
+            {
+                Row(b, "USB-ключ", string.Join("; ", r.Hasp4.UsbKeys.ToArray()));
+            }
+            if (r.Sentinel.Status.IndexOf("ACC", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                b.AppendLine("<p class=\"note\">Admin API менеджера лицензий закрыт (403) — данные ключей прочитаны через веб-интерфейс ACC: " +
+                              "tab_dev.html / tab_feat.html.</p>");
             }
 
             b.AppendLine("<h2>Устаревший менеджер HASP4 Net (1С 7.7 / 8.2)</h2>");

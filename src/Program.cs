@@ -109,7 +109,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.1.3";
+        public const string Version = "1.1.4";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -199,6 +199,7 @@ namespace OneCLicenseInspector
                 if (!string.IsNullOrEmpty(shot))
                 {
                     ScanResult sr = Scanner.Run(null);
+                MaskForDemo(sr);
                         SanitizeForDemo(sr);                    using (Ui.MainForm f = new Ui.MainForm(page))
                     {
                         int sw = 1220, sh = 780;
@@ -345,6 +346,29 @@ namespace OneCLicenseInspector
             }
             catch { }
         }
+        private static void MaskForDemo(ScanResult r)
+        {
+            foreach (SentinelKey k in r.Sentinel.Keys)
+            {
+                k.Id = MaskId(k.Id);
+                k.Name = string.IsNullOrEmpty(k.TypeName) ? "аппаратный ключ (демо)" : k.TypeName + " (демо)";
+                k.HostName = "DEMO-PC";
+            }
+            foreach (SentinelFeature f in r.Sentinel.Features) f.KeyId = MaskId(f.KeyId);
+            if (!string.IsNullOrEmpty(r.JavaPath)) r.JavaPath = @"C:\Program Files\Java\jre\bin\java.exe";
+            if (r.Hasp4.UsbKeys.Count > 0)
+            {
+                r.Hasp4.UsbKeys.Clear();
+                r.Hasp4.UsbKeys.Add("Sentinel HASP Key (демо)");
+            }
+        }
+
+        private static string MaskId(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return "****";
+            return id.Length > 4 ? id.Substring(0, 4) + "-****" : "****";
+        }
+
         private static string Arg(string[] args, string name)
         {
             for (int i = 0; i < args.Length; i++)

@@ -49,6 +49,7 @@ namespace OneCLicenseInspector
 
             r.HostId = ReadHostId();
             r.LicenseRing = FindRing(r.Platforms);
+            r.JavaPath = FindJava();
             if (!string.IsNullOrEmpty(r.LicenseRing))
             {
                 r.LicenseRingOutput = RunRing(r.LicenseRing, r.LicenseStorages);
@@ -242,6 +243,36 @@ namespace OneCLicenseInspector
                 }
             }
             return sb.ToString().Trim();
+        }
+        private static string FindJava()
+        {
+            string pathVar = Environment.GetEnvironmentVariable("PATH") ?? "";
+            foreach (string dir in pathVar.Split(';'))
+            {
+                if (string.IsNullOrEmpty(dir)) continue;
+                try
+                {
+                    string f = Path.Combine(dir.Trim(), "java.exe");
+                    if (File.Exists(f)) return f;
+                }
+                catch { }
+            }
+            string[] probe = new string[]
+            {
+                @"C:\Program Files\Java", @"C:\Program Files (x86)\Java",
+                @"C:\Program Files\Zulu", @"C:\Program Files\Eclipse Adoptium"
+            };
+            foreach (string dir in probe)
+            {
+                try
+                {
+                    if (!Directory.Exists(dir)) continue;
+                    string[] found = Directory.GetFiles(dir, "java.exe", SearchOption.AllDirectories);
+                    if (found.Length > 0) return found[0];
+                }
+                catch { }
+            }
+            return "";
         }
         private static string FindRing(List<PlatformInfo> platforms)
         {

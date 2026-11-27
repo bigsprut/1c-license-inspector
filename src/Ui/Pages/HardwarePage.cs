@@ -16,6 +16,8 @@ namespace OneCLicenseInspector.Ui
         private ScanResult _result;
         private FlatButton _btnMonitor;
         private FlatButton _btnImport;
+        private FlatButton _btnService;
+        private FlatButton _btnAcc;
         private int _lmRow;
         private int _haspRow;
 
@@ -77,6 +79,24 @@ namespace OneCLicenseInspector.Ui
             _btnImport.Click += delegate { ImportHaspInfo(); };
             tools.Controls.Add(_btnImport);
 
+            _btnService = new FlatButton();
+            _btnService.Text = "Запустить службу Sentinel";
+            _btnService.Icon = "refresh";
+            _btnService.Kind = ButtonKind.Secondary;
+            _btnService.Size = new Size(220, 34);
+            _btnService.Margin = new Padding(8, 3, 0, 0);
+            _btnService.Click += delegate { StartSentinelService(); };
+            tools.Controls.Add(_btnService);
+
+            _btnAcc = new FlatButton();
+            _btnAcc.Text = "Открыть ACC";
+            _btnAcc.Icon = "key";
+            _btnAcc.Kind = ButtonKind.Secondary;
+            _btnAcc.Size = new Size(140, 34);
+            _btnAcc.Margin = new Padding(8, 3, 0, 0);
+            _btnAcc.Click += delegate { OpenAcc(); };
+            tools.Controls.Add(_btnAcc);
+
             AddRow(tools, 42);
         }
 
@@ -111,6 +131,15 @@ namespace OneCLicenseInspector.Ui
             return t;
         }
 
+        private class KeyRow
+        {
+            public string Id { get; set; }
+            public string Name { get; set; }
+            public string TypeName { get; set; }
+            public string Location { get; set; }
+            public string Firmware { get; set; }
+            public string Sessions { get; set; }
+        }
         public override void Bind(ScanResult r)
         {
             _result = r;
@@ -119,8 +148,11 @@ namespace OneCLicenseInspector.Ui
             {
                 lm.Add(new KeyValuePair<string, string>("Состояние", "Работает · " + r.Sentinel.Status));
                 lm.Add(new KeyValuePair<string, string>("Версия менеджера", string.IsNullOrEmpty(r.Sentinel.Version) ? "—" : r.Sentinel.Version));
-                lm.Add(new KeyValuePair<string, string>("Сервер", r.Sentinel.ServerName + " · " + r.Sentinel.ServerOs));
-                lm.Add(new KeyValuePair<string, string>("Адреса", r.Sentinel.Addresses));
+                string srv = (r.Sentinel.ServerName ?? "").Trim();
+                string sov = (r.Sentinel.ServerOs ?? "").Trim();
+                if (sov.Length > 0) srv = srv.Length == 0 ? sov : srv + " · " + sov;
+                lm.Add(new KeyValuePair<string, string>("Сервер", srv.Length == 0 ? "—" : srv));
+                lm.Add(new KeyValuePair<string, string>("Адреса", string.IsNullOrEmpty(r.Sentinel.Addresses) ? "—" : r.Sentinel.Addresses));
                 lm.Add(new KeyValuePair<string, string>("Время работы", r.Sentinel.Uptime));
                 lm.Add(new KeyValuePair<string, string>("Подключений / сеансов", r.Sentinel.LoginCount + " / " + r.Sentinel.SessionCount));
                 if (!string.IsNullOrEmpty(r.Sentinel.DriverSummary))
@@ -130,13 +162,43 @@ namespace OneCLicenseInspector.Ui
             {
                 lm.Add(new KeyValuePair<string, string>("Состояние", "Менеджер лицензий не отвечает на 127.0.0.1:1947"));
                 lm.Add(new KeyValuePair<string, string>("Причина", string.IsNullOrEmpty(r.Sentinel.Error) ? "служба Sentinel LDK остановлена или не установлена" : r.Sentinel.Error));
-                lm.Add(new KeyValuePair<string, string>("Что это значит", "Аппаратные ключи Sentinel HL / HASP HL на этом компьютере недоступны. Если 1С работает, лицензии могут быть программными или выдаваться по сети."));
+                if (r.Sentinel.ServiceInstalled)
+                {
+                    lm.Add(new KeyValuePair<string, string>("Служба Sentinel LDK",
+                        r.Sentinel.ServiceRunning ? "запущена, но не отвечает" : "остановлена — ключи не читаются, пока её не запустить"));
+                }
+                else
+                {
+                    lm.Add(new KeyValuePair<string, string>("Служба Sentinel LDK", "не установлена — поставьте драйверы Sentinel LDK"));
+                }
+                if (r.Hasp4.UsbKeys.Count > 0)
+                {
+                    lm.Add(new KeyValuePair<string, string>("Что это значит",
+                        "физический ключ вставлен, но без службы программа не может прочитать его состав. Запустите службу кнопкой ниже и нажмите «Обновить» (F5)."));
+                }
+                else
+                {
+                    lm.Add(new KeyValuePair<string, string>("Что это значит",
+                        "ключ не найден ни в USB, ни через менеджер лицензий. Если 1С работает, лицензии могут быть программными или выдаваться по сети."));
+                }
             }
             _lm.Set(lm);
 
             _keyItems = r.Sentinel.Keys;
+            List<KeyRow> keyRows = new List<KeyRow>();
+            foreach (SentinelKey k in _keyItems)
+            {
+                KeyRow kr = new KeyRow();
+                kr.Id = k.Id;
+                kr.Name = string.IsNullOrEmpty(k.Name) ? k.Id : k.Name;
+                kr.TypeName = k.TypeName;
+                kr.Location = string.IsNullOrEmpty(k.Location) ? "Local" : k.Location;
+                kr.Firmware = k.Firmware;
+                kr.Sessions = k.Sessions;
+                keyRows.Add(kr);
+            }
             _keys.DataSource = null;
-            _keys.DataSource = _keyItems;
+            _keys.DataSource = keyRows;
             if (_keys.Rows.Count > 0) _keys.Rows[0].Selected = true;
 
             _featureItems = r.Sentinel.Features;
@@ -175,7 +237,37 @@ namespace OneCLicenseInspector.Ui
                 h.Add(new KeyValuePair<string, string>("Ключ по отчёту",
                     r.Hasp4.ReportedKeyId + (string.IsNullOrEmpty(r.Hasp4.ReportedKeyType) ? "" : " · " + r.Hasp4.ReportedKeyType)));
             }
+            if (r.Hasp4.UsbKeys.Count > 0)
+            {
+                h.Add(new KeyValuePair<string, string>("USB-ключ", string.Join("; ", r.Hasp4.UsbKeys.ToArray())));
+            }
+            if (r.Sentinel.Keys.Count == 0 && r.Hasp4.UsbKeys.Count > 0)
+            {
+                h.Add(new KeyValuePair<string, string>("Что делать", "ключ вставлен, но менеджер лицензий не отдал данные: запустите службу Sentinel LDK или откройте ACC."));
+            }
+            if (r.Sentinel.Keys.Count > 0 && r.Sentinel.Status.IndexOf("ACC", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                h.Add(new KeyValuePair<string, string>("Источник данных", "веб-интерфейс ACC (Admin API закрыт, ключи читаются через tab_dev/tab_feat)"));
+            }
             _hasp4.Set(h);
+
+            if (_btnService != null)
+            {
+                bool running = false;
+                try
+                {
+                    foreach (System.ServiceProcess.ServiceController sc in System.ServiceProcess.ServiceController.GetServices())
+                    {
+                        if (string.Equals(sc.ServiceName, "hasplms", StringComparison.OrdinalIgnoreCase))
+                        {
+                            running = sc.Status == System.ServiceProcess.ServiceControllerStatus.Running;
+                            break;
+                        }
+                    }
+                }
+                catch { }
+                _btnService.Enabled = !running;
+            }
 
             if (_btnMonitor != null)
             {
@@ -189,6 +281,32 @@ namespace OneCLicenseInspector.Ui
             int w = Root.ClientSize.Width > 300 ? Root.ClientSize.Width - 12 : 900;
             SetRowHeight(_lmRow, Math.Max(110, _lm.Measure(w) + 34));
             SetRowHeight(_haspRow, Math.Max(150, _hasp4.Measure(w) + 34));
+        }
+
+        private void StartSentinelService()
+        {
+            try
+            {
+                using (System.ServiceProcess.ServiceController sc = new System.ServiceProcess.ServiceController("hasplms"))
+                {
+                    if (sc.Status != System.ServiceProcess.ServiceControllerStatus.Running)
+                    {
+                        sc.Start();
+                        sc.WaitForStatus(System.ServiceProcess.ServiceControllerStatus.Running, TimeSpan.FromSeconds(10));
+                    }
+                }
+                MessageBox.Show("Служба Sentinel LDK запущена. Нажмите «Обновить» (F5), чтобы прочитать ключи.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Не удалось запустить службу: " + ex.Message);
+            }
+        }
+
+        private void OpenAcc()
+        {
+            try { System.Diagnostics.Process.Start("http://localhost:1947/_int_/devices.html"); }
+            catch { }
         }
 
         private void OpenMonitor()

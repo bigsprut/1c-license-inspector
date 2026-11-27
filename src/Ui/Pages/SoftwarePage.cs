@@ -97,9 +97,11 @@ namespace OneCLicenseInspector.Ui
                 r.LicenseStorages.Count == 0 ? "стандартные каталоги отсутствуют" : string.Join("; ", r.LicenseStorages.ToArray())));
             info.Add(new KeyValuePair<string, string>("Отпечаток ПК",
                 string.IsNullOrEmpty(r.HostId) ? "не найден (host_id отсутствует)" : Shorten(r.HostId, 140)));
+            info.Add(new KeyValuePair<string, string>("Java для ring",
+                string.IsNullOrEmpty(r.JavaPath) ? "не найдена — без Java утилита ring не запустится" : r.JavaPath));
             info.Add(new KeyValuePair<string, string>("Утилита ring",
                 string.IsNullOrEmpty(r.LicenseRing)
-                    ? "не найдена — описание лицензий (PIN, редакция, число мест) читает только утилита лицензирования 1С"
+                    ? "не найдена — PIN, редакцию и число мест читает только утилита лицензирования 1С"
                     : r.LicenseRing));
 
 
@@ -118,6 +120,7 @@ namespace OneCLicenseInspector.Ui
             else
             {
                 _ring.Text = "Утилита лицензирования 1С (ring) не найдена." + Environment.NewLine +
+                    (string.IsNullOrEmpty(r.JavaPath) ? "Java не найдена." : "Java есть: " + r.JavaPath) + Environment.NewLine +
                     "Если она установлена, программа покажет список лицензий с PIN, редакцией и числом мест автоматически." + Environment.NewLine +
                     "Утилита входит в комплект «1C:Enterprise License Tools» и требует Java.";
             }
