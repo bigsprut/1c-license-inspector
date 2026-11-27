@@ -192,6 +192,7 @@ namespace OneCLicenseInspector.Ui
             _procs.Columns.Add(Col("PID", "Pid", 60));
             _procs.Columns.Add(Col("Память, KB", "Memory", 85));
             _procs.Columns.Add(Col("Лицензия", "License", 80));
+            _procs.Columns.Add(Col("Тип лиц.", "TypeCode", 65));
             _procs.Columns.Add(Col("Рег. номер", "Pin", 110));
             _procs.Columns.Add(Col("Мест", "Seats", 60));
             _procs.Columns.Add(Col("Занято", "Used", 60));
@@ -207,6 +208,7 @@ namespace OneCLicenseInspector.Ui
             _sessions.Columns.Add(Col("Пользователь", "User", 130));
             _sessions.Columns.Add(Col("Приложение", "AppId", 110));
             _sessions.Columns.Add(Col("Лицензия", "License", 80));
+            _sessions.Columns.Add(Col("Тип лиц.", "TypeCode", 65));
             _sessions.Columns.Add(Col("Рег. номер", "Pin", 110));
             _sessions.Columns.Add(Col("Мест", "Seats", 60));
             _sessions.Columns.Add(Col("Занято", "Used", 60));
@@ -479,6 +481,7 @@ namespace OneCLicenseInspector.Ui
                 pr.Pin = pp;
                 int procCount; procUse.TryGetValue(pp, out procCount);
                 pr.Seats = pt >= 0 ? pt.ToString() : "";
+                pr.TypeCode = pu >= 0 ? pu.ToString() : "";
                 pr.Used = procCount.ToString();
                 pr.Free = pt > 0 ? Math.Max(0, pt - procCount).ToString() : "";
                 prows.Add(pr);
@@ -503,6 +506,7 @@ namespace OneCLicenseInspector.Ui
                 row.Pin = licPin;
                 int sessCount; sessUse.TryGetValue(licPin, out sessCount);
                 row.Seats = licTotal >= 0 ? licTotal.ToString() : "";
+                row.TypeCode = licUsed >= 0 ? licUsed.ToString() : "";
                 row.Used = sessCount.ToString();
                 row.Free = licTotal > 0 ? Math.Max(0, licTotal - sessCount).ToString() : "";
                 rows.Add(row);
@@ -652,6 +656,7 @@ namespace OneCLicenseInspector.Ui
             public string User { get; set; }
             public string AppId { get; set; }
             public string License { get; set; }
+            public string TypeCode { get; set; }
             public string Pin { get; set; }
             public string Used { get; set; }
             public string Seats { get; set; }
@@ -668,6 +673,7 @@ namespace OneCLicenseInspector.Ui
             public string Pid { get; set; }
             public string Memory { get; set; }
             public string License { get; set; }
+            public string TypeCode { get; set; }
             public string Pin { get; set; }
             public string Used { get; set; }
             public string Seats { get; set; }
