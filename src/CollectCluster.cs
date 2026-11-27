@@ -71,6 +71,30 @@ namespace OneCLicenseInspector
             Run(r, "", "", "");
         }
 
+        private static string RunningServerAgents()
+        {
+            List<string> names = new List<string>();
+            try
+            {
+                using (System.Management.ManagementObjectSearcher searcher = new System.Management.ManagementObjectSearcher(
+                    "SELECT Name,DisplayName,State FROM Win32_Service WHERE State='Running'"))
+                {
+                    foreach (System.Management.ManagementBaseObject o in searcher.Get())
+                    {
+                        string d = (Convert.ToString(o["Name"]) + " " + Convert.ToString(o["DisplayName"])).Trim();
+                        if (d.Length == 0) continue;
+                        bool agent = d.IndexOf("Server Agent", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                     d.IndexOf("Агент сервера", StringComparison.OrdinalIgnoreCase) >= 0;
+                        if (!agent) continue;
+                        if (d.IndexOf("8.2", StringComparison.Ordinal) >= 0 && !names.Contains("8.2")) names.Add("8.2");
+                        else if (d.IndexOf("8.3", StringComparison.Ordinal) >= 0 && !names.Contains("8.3")) names.Add("8.3");
+                    }
+                }
+            }
+            catch { }
+            return string.Join(", ", names.ToArray());
+        }
+
         public static void Run(ScanResult r, string endpoint, string user, string password)
         {
             ClusterInfo c = r.Cluster;
@@ -79,11 +103,22 @@ namespace OneCLicenseInspector
             c.Endpoint = endpoint;
 
             c.RacPath = FindRac(r);
+            string agents = RunningServerAgents();
             if (string.IsNullOrEmpty(c.RacPath))
             {
                 c.Available = false;
                 c.Error = "rac.exe не найден: нужна установленная платформа 1С 8.3";
-                c.Note = "Список сеансов и выданных лицензий читается утилитой rac из комплекта 1С 8.3.";
+                if (agents.IndexOf("8.2", StringComparison.Ordinal) >= 0 && agents.IndexOf("8.3", StringComparison.Ordinal) < 0)
+                {
+                    c.Error = "на сервере работает агент 1С 8.2 — в 8.2 утилиты rac нет";
+                    c.Note = "Сеансы и лицензии 8.2 показывает только консоль администрирования сервера 1С (MMC). " +
+                             "Для автоматического чтения нужен HASP Monitor (ключи HASP4, порт 475) либо переход баз на 8.3.";
+                }
+                else
+                {
+                    c.Note = "Список сеансов и выданных лицензий читается утилитой rac из комплекта 1С 8.3." +
+                             (agents.Length > 0 ? " Работающие агенты: " + agents + "." : "");
+                }
                 r.AddLog(LogLevel.Info, "Кластер", c.Error);
                 return;
             }
@@ -95,7 +130,10 @@ namespace OneCLicenseInspector
                 c.Available = false;
                 c.Error = "сервер администрирования не отвечает на " + endpoint;
                 c.Note = "Служба «1С:Предприятие. Сервер администрирования» (ras) не запущена или порт другой. " +
-                         "Запускается как ras.exe --port=1545 или службой Windows.";
+                         "Запускается как ras.exe --port=1545 или службой Windows." +
+                         (agents.IndexOf("8.2", StringComparison.Ordinal) >= 0
+                             ? " На сервере работает агент 8.2: его сеансы rac не видит — смотрите консоль администрирования 1С 8.2."
+                             : "");
                 r.AddLog(LogLevel.Info, "Кластер", c.Error);
                 return;
             }

@@ -135,6 +135,10 @@ namespace OneCLicenseInspector
             {
                 Row(b, "USB-ключ", string.Join("; ", r.Hasp4.UsbKeys.ToArray()));
             }
+            if (r.Hasp4.PortListening && r.Sentinel.Keys.Count == 0 && r.Hasp4.UsbKeys.Count > 0)
+            {
+                Row(b, "Ключ обслуживает", "HASP4 Net (порт 475); количество мест показывает только HASP Monitor");
+            }
             if (r.Sentinel.Status.IndexOf("ACC", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 b.AppendLine("<p class=\"note\">Admin API менеджера лицензий закрыт (403) — данные ключей прочитаны через веб-интерфейс ACC: " +

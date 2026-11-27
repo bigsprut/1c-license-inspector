@@ -241,6 +241,11 @@ namespace OneCLicenseInspector.Ui
             {
                 h.Add(new KeyValuePair<string, string>("USB-ключ", string.Join("; ", r.Hasp4.UsbKeys.ToArray())));
             }
+            if (r.Hasp4.PortListening && r.Sentinel.Keys.Count == 0 && r.Hasp4.UsbKeys.Count > 0)
+            {
+                h.Add(new KeyValuePair<string, string>("Ключ обслуживает",
+                    "HASP4 Net (порт 475), а не Sentinel LDK — количество мест по такому ключу показывает только HASP Monitor"));
+            }
             if (r.Sentinel.Keys.Count == 0 && r.Hasp4.UsbKeys.Count > 0)
             {
                 h.Add(new KeyValuePair<string, string>("Что делать", "ключ вставлен, но менеджер лицензий не отдал данные: запустите службу Sentinel LDK или откройте ACC."));
