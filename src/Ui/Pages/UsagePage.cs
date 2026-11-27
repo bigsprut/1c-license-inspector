@@ -294,8 +294,8 @@ namespace OneCLicenseInspector.Ui
         {
             string[] probes = new string[]
             {
-                Path.Combine(Paths.ProgramFilesX86, "1cv82", "common", "1CV8 Servers.msc"),
                 Path.Combine(Paths.ProgramFiles, "1cv82", "common", "1CV8 Servers (x86-64).msc"),
+                Path.Combine(Paths.ProgramFilesX86, "1cv82", "common", "1CV8 Servers.msc"),
                 Path.Combine(Paths.ProgramFiles, "1cv82", "common", "1CV8 Servers.msc"),
                 Path.Combine(Paths.ProgramFilesX86, "1cv82", "common", "1CV8 Servers (x86-64).msc")
             };

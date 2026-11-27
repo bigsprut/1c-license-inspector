@@ -35,6 +35,7 @@ namespace OneCLicenseInspector
             SafeRun(r, "Использование", delegate { CollectUsage.Run(r); });
             Report1(progress, "Опрос кластера 1С…");
             SafeRun(r, "Кластер", delegate { CollectCluster.Run(r, Program.RasEndpoint, Program.ClusterUser, Program.ClusterPwd); });
+            try { AutoConsole82.TryAutoCollect(r); } catch { }
 
             r.Finished = DateTime.Now;
             CrossCheck(r);
@@ -109,7 +110,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.4.2";
+        public const string Version = "1.4.3";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
