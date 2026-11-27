@@ -542,7 +542,9 @@ namespace OneCLicenseInspector.Ui
             }
             else if (c.Sessions.Count == 0 && c.Processes.Count == 0)
             {
-                _sessHint.Text = "Кластер " + c.Endpoint + " отвечает, активных сеансов нет.";
+                _sessHint.Text = string.IsNullOrEmpty(c.Error)
+                    ? "Кластер " + c.Endpoint + " отвечает, активных сеансов нет."
+                    : "Кластер отвечает, но сеансы не получены: " + c.Error;
             }
             else
             {
