@@ -116,7 +116,7 @@ namespace OneCLicenseInspector.Ui
             {
                 g.FillEllipse(b, dotX, (Height - dotSize) / 2 + Dpi.S(g, 1), dotSize, dotSize);
             }
-            int rightW = Dpi.S(g, 300);
+            int rightW = Dpi.S(g, 210);
             TextRenderer.DrawText(g, LeftText, Theme.Small, new Rectangle(dotX + dotSize + Dpi.S(g, 8), 0, Width - rightW, Height), Theme.Muted,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
             TextRenderer.DrawText(g, RightText, Theme.Small, new Rectangle(Width - rightW + Dpi.S(g, 14), 0, rightW - Dpi.S(g, 20), Height), Theme.Muted,
@@ -148,8 +148,7 @@ namespace OneCLicenseInspector.Ui
             Text = "Инспектор лицензий 1С";
             BackColor = Theme.Canvas;
             Font = Theme.Body;
-            AutoScaleDimensions = new SizeF(96f, 96f);
-            AutoScaleMode = AutoScaleMode.Dpi;
+            AutoScaleMode = AutoScaleMode.None;
             StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(1220, 780);
             MinimumSize = new Size(1020, 660);
@@ -172,7 +171,7 @@ namespace OneCLicenseInspector.Ui
 
             _nav = new BufferedPanel();
             _nav.Dock = DockStyle.Left;
-            _nav.Width = 218;
+            _nav.Width = 236;
             _nav.BackColor = Color.White;
             _nav.Padding = new Padding(8, 12, 8, 8);
             _nav.Paint += NavPaint;
@@ -350,7 +349,7 @@ namespace OneCLicenseInspector.Ui
             _status.LeftText = "Готово · найдено платформ: " + r.Platforms.Count + ", ключей: " + r.Sentinel.Keys.Count +
                                ", файлов лицензий: " + r.LicenseFiles.Count +
                                ", предупреждений: " + r.Warnings.Count;
-            _status.RightText = "Обновлено " + r.Finished.ToString("HH:mm:ss") + "  ·  " + Fmt.Duration(r.Finished - r.Started);
+            _status.RightText = "обновлено " + r.Finished.ToString("HH:mm") + "  ·  " + Fmt.Duration(r.Finished - r.Started);
             _status.Invalidate();
         }
 

@@ -94,6 +94,30 @@ namespace OneCLicenseInspector
                 r.AddLog(LogLevel.Info, "HASP4", "Порт 475 (HASP4 Net) прослушивается");
             }
 
+            // Поиск утилит HASP: HASPInfo (консольная) или HASP Monitor (графическая).
+            string toolPath;
+            string toolKind;
+            FindHaspTool(out toolPath, out toolKind);
+            if (!string.IsNullOrEmpty(toolPath))
+            {
+                h.ToolPath = toolPath;
+                h.ToolKind = toolKind;
+                r.AddLog(LogLevel.Info, "HASP4", "Утилита HASP: " + toolPath + " (" + toolKind + ")");
+                if (string.Equals(toolKind, "info", StringComparison.OrdinalIgnoreCase))
+                {
+                    string so, se;
+                    int code = Exec.Run(toolPath, "-d", 8000, out so, out se);
+                    if (string.IsNullOrEmpty(so.Trim()))
+                    {
+                        int code2 = Exec.Run(toolPath, "", 8000, out so, out se);
+                        code = code2;
+                    }
+                    h.ToolOutput = (so ?? "").Trim();
+                    if (h.ToolOutput.Length == 0 && !string.IsNullOrEmpty(se)) h.ToolOutput = se.Trim();
+                    ParseHaspInfo(h);
+                    r.AddLog(LogLevel.Info, "HASP4", "HASPInfo: код " + code + ", строк " + CountLines(h.ToolOutput));
+                }
+            }
             if (h.ServiceInstalled || h.PortListening)
             {
                 h.Comment = "Обнаружен устаревший менеджер лицензий HASP4 Net (для 1С 7.7 и 8.2). " +
@@ -185,6 +209,92 @@ namespace OneCLicenseInspector
             return v;
         }
 
+        private static int CountLines(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return 0;
+            return s.Replace("\r", "").Split('\n').Length;
+        }
+
+        private static void FindHaspTool(out string path, out string kind)
+        {
+            path = "";
+            kind = "";
+            if (!string.IsNullOrEmpty(Program.HaspInfoOverride) && File.Exists(Program.HaspInfoOverride))
+            {
+                path = Program.HaspInfoOverride;
+                kind = "info";
+                return;
+            }
+
+            List<string> dirs = new List<string>();
+            foreach (string baseDir in new string[] { Paths.ProgramFiles, Paths.ProgramFilesX86 })
+            {
+                dirs.Add(Path.Combine(baseDir, "Aladdin", "HASP LM"));
+                dirs.Add(Path.Combine(baseDir, "Aladdin"));
+                dirs.Add(Path.Combine(baseDir, "SafeNet"));
+                dirs.Add(Path.Combine(baseDir, "SafeNet Sentinel", "Sentinel LDK"));
+                dirs.Add(Path.Combine(baseDir, "1C", "1CE"));
+                dirs.Add(Path.Combine(baseDir, "1cv8", "common"));
+            }
+            string pathVar = Environment.GetEnvironmentVariable("PATH") ?? "";
+            foreach (string p in pathVar.Split(';'))
+            {
+                if (!string.IsNullOrEmpty(p)) dirs.Add(p);
+            }
+
+            string[] infoNames = new string[] { "haspinfo.exe", "haspinfo64.exe" };
+            string[] monitorNames = new string[] { "haspmntr.exe", "haspmon.exe", "hasp monitor.exe" };
+
+            foreach (string dir in dirs)
+            {
+                try
+                {
+                    foreach (string n in infoNames)
+                    {
+                        string f = Path.Combine(dir, n);
+                        if (File.Exists(f)) { path = f; kind = "info"; return; }
+                    }
+                    foreach (string n in monitorNames)
+                    {
+                        string f = Path.Combine(dir, n);
+                        if (File.Exists(f)) { path = f; kind = "monitor"; return; }
+                    }
+                }
+                catch { }
+            }
+        }
+
+        public static void ParseToolOutput(Hasp4Info h)
+        {
+            ParseHaspInfo(h);
+        }
+
+        private static void ParseHaspInfo(Hasp4Info h)
+        {
+            if (string.IsNullOrEmpty(h.ToolOutput)) return;
+            foreach (string raw in h.ToolOutput.Replace("\r", "").Split('\n'))
+            {
+                string line = raw.Trim();
+                if (line.Length == 0) continue;
+                string low = line.ToLowerInvariant();
+                if (h.ReportedKeyId.Length == 0 && (low.IndexOf("hasp id") >= 0 || low.IndexOf("hasp-id") >= 0))
+                {
+                    h.ReportedKeyId = AfterColon(line);
+                }
+                else if (h.ReportedKeyType.Length == 0 && (low.IndexOf("key type") >= 0 || low.IndexOf("тип ключа") >= 0))
+                {
+                    h.ReportedKeyType = AfterColon(line);
+                }
+            }
+        }
+
+        private static string AfterColon(string line)
+        {
+            int i = line.IndexOf(':');
+            if (i < 0) i = line.IndexOf('=');
+            if (i < 0) return "";
+            return line.Substring(i + 1).Trim();
+        }
         public static bool IsListening(int port)
         {
             try

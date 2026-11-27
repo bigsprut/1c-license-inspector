@@ -110,6 +110,7 @@ namespace OneCLicenseInspector.Ui
         {
             DataGridView g = new DataGridView();
             Theme.StyleGrid(g);
+            g.TabStop = false;
             return g;
         }
 

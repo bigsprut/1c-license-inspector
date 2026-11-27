@@ -162,6 +162,11 @@ namespace OneCLicenseInspector
         public string AddressFile = "";
         public string NethaspIni = "";
         public string Comment = "";
+        public string ToolPath = "";
+        public string ToolKind = "";
+        public string ToolOutput = "";
+        public string ReportedKeyId = "";
+        public string ReportedKeyType = "";
     }
 
     public class ServiceInfo
@@ -223,6 +228,7 @@ namespace OneCLicenseInspector
         public string LicenseRingOutput = "";
         public SentinelInfo Sentinel = new SentinelInfo();
         public Hasp4Info Hasp4 = new Hasp4Info();
+        public ClusterInfo Cluster = new ClusterInfo();
         public List<ServiceInfo> Services = new List<ServiceInfo>();
         public List<ProcessInfo> Processes = new List<ProcessInfo>();
         public List<PortInfo> Ports = new List<PortInfo>();
@@ -277,5 +283,45 @@ namespace OneCLicenseInspector
             }
             return n;
         }
+    }
+
+    public class ClusterEntry
+    {
+        public string Id = "";
+        public string Name = "";
+        public string Host = "";
+        public string Port = "";
+        public string Expiration = "";
+    }
+
+    public class SessionEntry
+    {
+        public string SessionId = "";
+        public string User = "";
+        public string Host = "";
+        public string AppId = "";
+        public string Infobase = "";
+        public string StartedAt = "";
+        public string LicenseType = "";
+        public string LicenseSeries = "";
+        public string LicenseFullName = "";
+        public string IssuedByServer = "";
+        public string MaxUsersAll = "";
+        public string MaxUsersCur = "";
+        public string LicenseShort = "";
+        public string LicenseFull = "";
+        public string ClusterName = "";
+    }
+
+    public class ClusterInfo
+    {
+        public bool Available;
+        public string Endpoint = "localhost:1545";
+        public string RacPath = "";
+        public string Error = "";
+        public string Note = "";
+        public List<ClusterEntry> Clusters = new List<ClusterEntry>();
+        public List<SessionEntry> Sessions = new List<SessionEntry>();
+        public string Raw = "";
     }
 }

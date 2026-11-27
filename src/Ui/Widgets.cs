@@ -10,14 +10,12 @@ namespace OneCLicenseInspector.Ui
     {
         public static int S(Graphics g, int v)
         {
-            if (g == null) return v;
-            return (int)Math.Round(v * g.DpiX / 96f);
+            return v;
         }
 
         public static float S(Graphics g, float v)
         {
-            if (g == null) return v;
-            return v * g.DpiX / 96f;
+            return v;
         }
 
         public static Font Font(Graphics g, Font baseFont)

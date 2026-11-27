@@ -13,6 +13,9 @@ namespace OneCLicenseInspector.Ui
         private KeyValueList _lm;
         private List<SentinelKey> _keyItems = new List<SentinelKey>();
         private List<SentinelFeature> _featureItems = new List<SentinelFeature>();
+        private ScanResult _result;
+        private FlatButton _btnMonitor;
+        private FlatButton _btnImport;
 
         public HardwarePage()
         {
@@ -27,7 +30,7 @@ namespace OneCLicenseInspector.Ui
             _keys.Columns.Add(Col("Название", "Name", 130));
             _keys.Columns.Add(Col("Тип", "TypeName", 120));
             _keys.Columns.Add(Col("Расположение", "Location", 90));
-            _keys.Columns.Add(Col("Прошивка", "Firmware", 70));
+            _keys.Columns.Add(Col("ПО", "Firmware", 60));
             _keys.Columns.Add(Col("Сеансов", "Sessions", 60));
             _keys.SelectionChanged += delegate { FilterFeatures(); };
             AddRow(WithTitle("Ключи", Card(_keys, new Padding(1))), 150);
@@ -38,15 +41,41 @@ namespace OneCLicenseInspector.Ui
             _features.Columns.Add(Col("ID", "FeatureId", 45));
             _features.Columns.Add(Col("Компонент", "Name", 190));
             _features.Columns.Add(Col("Тип", "Type", 110));
-            _features.Columns.Add(Col("Занято", "Logins", 60));
+            _features.Columns.Add(Col("Зан.", "Logins", 55));
             _features.Columns.Add(Col("Всего", "Limit", 60));
-            _features.Columns.Add(Col("Свободно", "FreeText", 80));
-            _features.Columns.Add(Col("Ограничение", "ExpireText", 110));
+            _features.Columns.Add(Col("Своб.", "FreeText", 70));
+            _features.Columns.Add(Col("Ограничение", "ExpireText", 105));
             AddRow(WithTitle("Компоненты лицензий и свободные места", Card(_features, new Padding(1))), 210);
             AddSpacer(6);
 
             _hasp4 = new KeyValueList();
-            AddRow(WithTitle("Устаревший менеджер HASP4 Net", Card(_hasp4, new Padding(0))), 186);
+            AddRow(WithTitle("Устаревший менеджер HASP4 Net", Card(_hasp4, new Padding(0))), 196);
+            AddSpacer(6);
+
+            FlowLayoutPanel tools = new FlowLayoutPanel();
+            tools.Dock = DockStyle.Fill;
+            tools.BackColor = Theme.Canvas;
+            tools.WrapContents = false;
+            tools.Padding = new Padding(0);
+
+            _btnMonitor = new FlatButton();
+            _btnMonitor.Text = "Открыть HASP Monitor";
+            _btnMonitor.Icon = "key";
+            _btnMonitor.Kind = ButtonKind.Secondary;
+            _btnMonitor.Size = new Size(200, 34);
+            _btnMonitor.Click += delegate { OpenMonitor(); };
+            tools.Controls.Add(_btnMonitor);
+
+            _btnImport = new FlatButton();
+            _btnImport.Text = "Загрузить отчёт HASPInfo…";
+            _btnImport.Icon = "file";
+            _btnImport.Kind = ButtonKind.Secondary;
+            _btnImport.Size = new Size(236, 34);
+            _btnImport.Margin = new Padding(8, 3, 0, 0);
+            _btnImport.Click += delegate { ImportHaspInfo(); };
+            tools.Controls.Add(_btnImport);
+
+            AddRow(tools, 42);
         }
 
         private DataGridViewColumn Col(string header, string prop, int weight)
@@ -82,6 +111,7 @@ namespace OneCLicenseInspector.Ui
 
         public override void Bind(ScanResult r)
         {
+            _result = r;
             List<KeyValuePair<string, string>> lm = new List<KeyValuePair<string, string>>();
             if (r.Sentinel.Available)
             {
@@ -127,7 +157,72 @@ namespace OneCLicenseInspector.Ui
                 h.Add(new KeyValuePair<string, string>("Примечание", r.Hasp4.Comment));
                 h.Add(new KeyValuePair<string, string>("Для 1С 7.7", "Если используется локальный USB-ключ, проверьте, что он вставлен и установлен драйвер HASP."));
             }
+            if (!string.IsNullOrEmpty(r.Hasp4.ToolPath))
+            {
+                string kind = string.Equals(r.Hasp4.ToolKind, "monitor", StringComparison.OrdinalIgnoreCase)
+                    ? "HASP Monitor (графическая)"
+                    : "HASPInfo (консольная)";
+                h.Add(new KeyValuePair<string, string>("Утилита HASP", kind + ": " + r.Hasp4.ToolPath));
+            }
+            else
+            {
+                h.Add(new KeyValuePair<string, string>("Утилита HASP", "не найдена — состав лицензий показывает HASP Monitor или отчёт HASPInfo"));
+            }
+            if (!string.IsNullOrEmpty(r.Hasp4.ReportedKeyId))
+            {
+                h.Add(new KeyValuePair<string, string>("Ключ по отчёту",
+                    r.Hasp4.ReportedKeyId + (string.IsNullOrEmpty(r.Hasp4.ReportedKeyType) ? "" : " · " + r.Hasp4.ReportedKeyType)));
+            }
             _hasp4.Set(h);
+
+            if (_btnMonitor != null)
+            {
+                _btnMonitor.Enabled = !string.IsNullOrEmpty(r.Hasp4.ToolPath) &&
+                                      string.Equals(r.Hasp4.ToolKind, "monitor", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private void OpenMonitor()
+        {
+            try
+            {
+                if (_result == null || string.IsNullOrEmpty(_result.Hasp4.ToolPath)) return;
+                System.Diagnostics.Process.Start(_result.Hasp4.ToolPath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Не удалось запустить HASP Monitor: " + ex.Message);
+            }
+        }
+
+        private void ImportHaspInfo()
+        {
+            try
+            {
+                using (OpenFileDialog dlg = new OpenFileDialog())
+                {
+                    dlg.Title = "Отчёт HASPInfo";
+                    dlg.Filter = "Отчёт HASPInfo (*.haspinfo;*.txt)|*.haspinfo;*.txt|Все файлы (*.*)|*.*";
+                    if (dlg.ShowDialog() != DialogResult.OK) return;
+                    if (_result == null) return;
+
+                    string text = System.IO.File.ReadAllText(dlg.FileName);
+                    _result.Hasp4.ToolPath = dlg.FileName;
+                    _result.Hasp4.ToolKind = "info";
+                    _result.Hasp4.ToolOutput = text;
+                    _result.Hasp4.ReportedKeyId = "";
+                    _result.Hasp4.ReportedKeyType = "";
+                    CollectHasp4.ParseToolOutput(_result.Hasp4);
+                    Bind(_result);
+                    MessageBox.Show("Отчёт загружен. Ключ: " +
+                                    (string.IsNullOrEmpty(_result.Hasp4.ReportedKeyId) ? "идентификатор не распознан" : _result.Hasp4.ReportedKeyId),
+                        "HASPInfo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Не удалось прочитать отчёт: " + ex.Message);
+            }
         }
 
         private void FilterFeatures()

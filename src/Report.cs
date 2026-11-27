@@ -129,6 +129,21 @@ namespace OneCLicenseInspector
             b.AppendLine("</table>");
             if (!string.IsNullOrEmpty(r.Hasp4.Comment)) b.AppendLine("<p class=\"note\">" + H(r.Hasp4.Comment) + "</p>");
 
+            if (!string.IsNullOrEmpty(r.Hasp4.ToolOutput))
+            {
+                b.AppendLine("<p class=\"note\">Отчёт утилиты HASP (" + H(r.Hasp4.ToolKind) + "): <code>" + H(r.Hasp4.ToolPath) + "</code></p>");
+                b.AppendLine("<pre>" + H(r.Hasp4.ToolOutput) + "</pre>");
+            }
+            else if (!string.IsNullOrEmpty(r.Hasp4.ToolPath))
+            {
+                b.AppendLine("<p class=\"note\">Найдена утилита HASP: <code>" + H(r.Hasp4.ToolPath) + "</code>. " +
+                             "Она графическая — запустите её из программы, чтобы увидеть состав ключа.</p>");
+            }
+            else
+            {
+                b.AppendLine("<p class=\"note\">HASPInfo / HASP Monitor не найдены. Состав лицензий в ключах HASP4 " +
+                             "показывает только HASP Monitor (входит в HASP4 SDK) либо сохранённый отчёт HASPInfo (*.haspinfo).</p>");
+            }
             b.AppendLine("<h2>Программные лицензии</h2>");
             if (r.LicenseStorages.Count > 0)
             {
@@ -182,6 +197,36 @@ namespace OneCLicenseInspector
             }
             b.AppendLine("</table>");
 
+            b.AppendLine("<h2>Сеансы 1С и выданные лицензии</h2>");
+            if (!r.Cluster.Available)
+            {
+                b.AppendLine("<p class=\"muted\">" + H(r.Cluster.Error) + "</p>");
+                if (!string.IsNullOrEmpty(r.Cluster.Note)) b.AppendLine("<p class=\"note\">" + H(r.Cluster.Note) + "</p>");
+            }
+            else if (r.Cluster.Sessions.Count == 0)
+            {
+                b.AppendLine("<p class=\"muted\">Активных сеансов нет (" + H(r.Cluster.Endpoint) + ").</p>");
+                if (!string.IsNullOrEmpty(r.Cluster.Error)) b.AppendLine("<p class=\"note\">" + H(r.Cluster.Error) + "</p>");
+            }
+            else
+            {
+                b.AppendLine("<table><tr><th>Пользователь</th><th>Компьютер</th><th>Приложение</th><th>База</th><th>Начало</th><th>Лицензия</th><th>Мест</th></tr>");
+                foreach (SessionEntry s in r.Cluster.Sessions)
+                {
+                    string lic = s.LicenseShort;
+                    if (string.IsNullOrEmpty(lic))
+                    {
+                        lic = (s.LicenseType + " " + s.LicenseSeries + " " + s.LicenseFullName).Trim();
+                    }
+                    string seats = s.MaxUsersCur;
+                    if (!string.IsNullOrEmpty(s.MaxUsersAll)) seats = seats + " / " + s.MaxUsersAll;
+                    b.AppendLine("<tr><td><b>" + H(s.User.Length == 0 ? "(не определён)" : s.User) + "</b></td><td>" + H(s.Host) +
+                                "</td><td>" + H(s.AppId) + "</td><td class=\"muted\">" + H(ShortId(s.Infobase)) + "</td><td>" + H(s.StartedAt) +
+                                "</td><td>" + H(lic) + "</td><td>" + H(seats) + "</td></tr>");
+                }
+                b.AppendLine("</table>");
+                if (!string.IsNullOrEmpty(r.Cluster.Error)) b.AppendLine("<p class=\"note\">" + H(r.Cluster.Error) + "</p>");
+            }
             b.AppendLine("<h2>Сетевые порты</h2>");
             b.AppendLine("<table><tr><th>Порт</th><th>Протокол</th><th>Процесс</th><th>PID</th><th>Назначение</th></tr>");
             foreach (PortInfo p in r.Ports)
@@ -237,6 +282,11 @@ namespace OneCLicenseInspector
             return b.ToString();
         }
 
+        private static string ShortId(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return "";
+            return id.Length > 8 ? id.Substring(0, 8) + "…" : id;
+        }
         private static void Card(StringBuilder b, string number, string label)
         {
             b.AppendLine("<div class=\"card\"><div class=\"n\">" + H(number) + "</div><div class=\"l\">" + H(label) + "</div></div>");

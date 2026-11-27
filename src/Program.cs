@@ -33,6 +33,8 @@ namespace OneCLicenseInspector
             Report1(progress, "Сбор сведений об использовании…");
             Diag.Log("scan: usage");
             SafeRun(r, "Использование", delegate { CollectUsage.Run(r); });
+            Report1(progress, "Опрос кластера 1С…");
+            SafeRun(r, "Кластер", delegate { CollectCluster.Run(r, Program.RasEndpoint, Program.ClusterUser, Program.ClusterPwd); });
 
             r.Finished = DateTime.Now;
             CrossCheck(r);
@@ -107,8 +109,14 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.0.0";
+        public const string Version = "1.1.0";
         public static string LastReportPath = "";
+        public static string RacOverride = "";
+        public static string HaspInfoOverride = "";
+        public static string RasEndpoint = "";
+        public static string ClusterUser = "";
+        public static string ClusterPwd = "";
+        public static int InitialUsageTab = 0;
 
         [STAThread]
         private static int Main(string[] args)
@@ -119,6 +127,15 @@ namespace OneCLicenseInspector
                 Application.EnableVisualStyles();
                 Boot("styles ok");
                 Application.SetCompatibleTextRenderingDefault(false);
+
+                RacOverride = Arg(args, "/rac");
+                HaspInfoOverride = Arg(args, "/haspinfo");
+                RasEndpoint = Arg(args, "/ras");
+                ClusterUser = Arg(args, "/clusteruser");
+                ClusterPwd = Arg(args, "/clusterpwd");
+                int usageTab = 0;
+                int.TryParse(Arg(args, "/usagetab"), out usageTab);
+                InitialUsageTab = usageTab;
                 Boot("text rendering ok");
 
                 string report = Arg(args, "/report");
@@ -155,7 +172,20 @@ namespace OneCLicenseInspector
                     ScanResult sr = Scanner.Run(null);
                         SanitizeForDemo(sr);                    using (Ui.MainForm f = new Ui.MainForm(page))
                     {
-                        f.Size = new System.Drawing.Size(1220, 780);
+                        int sw = 1220, sh = 780;
+                        string sizeArg = Arg(args, "/shotsize");
+                        if (!string.IsNullOrEmpty(sizeArg))
+                        {
+                            string[] parts = sizeArg.Split('x');
+                            if (parts.Length == 2)
+                            {
+                                int.TryParse(parts[0], out sw);
+                                int.TryParse(parts[1], out sh);
+                            }
+                        }
+                        if (sw < 800) sw = 1220;
+                        if (sh < 600) sh = 780;
+                        f.Size = new System.Drawing.Size(sw, sh);
                         f.AutoScan = false;
                         bool interactive = System.Diagnostics.Process.GetCurrentProcess().SessionId != 0;
                         f.PerformLayout();
@@ -180,6 +210,8 @@ namespace OneCLicenseInspector
                         {
                             f.DrawToBitmap(bmp, new System.Drawing.Rectangle(0, 0, f.Width, f.Height));
                             bmp.Save(shot, System.Drawing.Imaging.ImageFormat.Png);
+                            try { System.IO.File.Delete(shot + ".txt"); } catch { }
+                            DumpControls(f, shot + ".txt", 0);
                         }
                     }
                     return 0;
@@ -244,6 +276,19 @@ namespace OneCLicenseInspector
                 if (!string.IsNullOrEmpty(user)) e.Text = e.Text.Replace(user, "user");
                 if (!string.IsNullOrEmpty(domain)) e.Text = e.Text.Replace(domain, "WORKGROUP");
             }
+        }
+        private static void DumpControls(System.Windows.Forms.Control c, string path, int depth)
+        {
+            try
+            {
+                string line = new string(' ', depth * 2) + c.GetType().Name + " " + c.Bounds + (c.Visible ? "" : " [hidden]");
+                System.IO.File.AppendAllText(path, line + Environment.NewLine);
+                if (depth < 6)
+                {
+                    foreach (System.Windows.Forms.Control child in c.Controls) DumpControls(child, path, depth + 1);
+                }
+            }
+            catch { }
         }
         private static void MakeHandles(System.Windows.Forms.Control c)
         {
