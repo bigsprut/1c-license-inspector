@@ -1,0 +1,21 @@
+# Сборка
+build/
+*.log
+*.tmp
+
+# Отчёты и снимки, сделанные вручную
+final-check.*
+ui-page*.png
+shot-*.png
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+bin/
+obj/
+
+# Прочее
+Thumbs.db
+desktop.ini

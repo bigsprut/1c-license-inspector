@@ -1,0 +1,290 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+using System.Threading;
+using System.Windows.Forms;
+
+namespace OneCLicenseInspector
+{
+    internal static class Scanner
+    {
+        public static ScanResult Run(Action<string> progress)
+        {
+            Diag.Reset();
+            Diag.Log("scan: begin");
+            ScanResult r = new ScanResult();
+            r.Started = DateTime.Now;
+            Report1(progress, "Сбор сведений о компьютере…");
+            Diag.Log("scan: system");
+            SafeRun(r, "Система", delegate { CollectSystem.Run(r); });
+            Report1(progress, "Поиск платформ 1С…");
+            Diag.Log("scan: platforms");
+            SafeRun(r, "Платформы", delegate { CollectPlatforms.Run(r); });
+            Report1(progress, "Поиск файлов программных лицензий…");
+            Diag.Log("scan: licenses");
+            SafeRun(r, "Лицензии", delegate { CollectLicenses.Run(r); });
+            Report1(progress, "Опрос менеджера лицензий Sentinel LDK…");
+            Diag.Log("scan: sentinel");
+            SafeRun(r, "Sentinel", delegate { CollectSentinel.Run(r); });
+            Report1(progress, "Проверка HASP4 и служб…");
+            Diag.Log("scan: hasp4");
+            SafeRun(r, "HASP4", delegate { CollectHasp4.Run(r); });
+            Report1(progress, "Сбор сведений об использовании…");
+            Diag.Log("scan: usage");
+            SafeRun(r, "Использование", delegate { CollectUsage.Run(r); });
+
+            r.Finished = DateTime.Now;
+            CrossCheck(r);
+            Diag.Log("scan: done");
+            r.MachineInfo = r.System.ComputerName + " · " + r.System.OsCaption + " " + r.System.OsArch;
+            Report1(progress, "Готово");
+            return r;
+        }
+
+        private static void SafeRun(ScanResult r, string name, Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                r.AddLog(LogLevel.Error, name, "Сбой сбора: " + ex.GetType().Name + ": " + ex.Message);
+                r.AddWarning(LogLevel.Warn, "Ошибка в разделе «" + name + "»", ex.Message);
+            }
+        }
+
+        private static void Report1(Action<string> progress, string text)
+        {
+            if (progress != null)
+            {
+                try { progress(text); }
+                catch { }
+            }
+        }
+
+        private static void CrossCheck(ScanResult r)
+        {
+            bool has8 = false;
+            bool has77 = false;
+            foreach (PlatformInfo p in r.Platforms)
+            {
+                if (p.Family.IndexOf("7.7", StringComparison.Ordinal) >= 0) has77 = true;
+                else has8 = true;
+            }
+
+            if (has77 && !r.Hasp4.ServiceInstalled && !r.Hasp4.PortListening)
+            {
+                r.AddWarning(LogLevel.Info, "Для 1С 7.7 не найден менеджер лицензий",
+                    "Платформа 1С 7.7 установлена, но ни служба HASP License Manager (nhsrvice), ни порт 475 не обнаружены. " +
+                    "Если используется локальный USB-ключ, проверьте, что он вставлен и установлен драйвер HASP.");
+            }
+
+            if (has8 && r.Sentinel.Keys.Count == 0 && r.LicenseFiles.Count == 0 && !r.Hasp4.PortListening)
+            {
+                r.AddWarning(LogLevel.Warn, "Не найдено ни одной лицензии 1С",
+                    "Установлена платформа 1С:Предприятие 8, но не обнаружены ни аппаратные ключи, ни файлы программных лицензий. " +
+                    "Возможные причины: ключ не вставлен, службы защиты остановлены, лицензии выдаются по сети с другого сервера, " +
+                    "либо используется базовая версия с ограничениями.");
+            }
+
+            if (r.Sentinel.Available && r.Sentinel.Features.Count > 0)
+            {
+                int expired = 0;
+                foreach (SentinelFeature f in r.Sentinel.Features)
+                {
+                    if (!string.IsNullOrEmpty(f.Unusable) && f.Unusable != "0") expired++;
+                }
+                if (expired > 0)
+                {
+                    r.AddWarning(LogLevel.Warn, "Есть недоступные компоненты",
+                        "Компонентов с признаком недоступности: " + expired + ". Возможно истечение срока или блокировка.");
+                }
+            }
+        }
+    }
+
+    internal static class Program
+    {
+        public const string Version = "1.0.0";
+        public static string LastReportPath = "";
+
+        [STAThread]
+        private static int Main(string[] args)
+        {
+            Boot("enter: " + string.Join(" ", args));
+            try
+            {
+                Application.EnableVisualStyles();
+                Boot("styles ok");
+                Application.SetCompatibleTextRenderingDefault(false);
+                Boot("text rendering ok");
+
+                string report = Arg(args, "/report");
+                string csv = Arg(args, "/csv");
+                bool silent = Has(args, "/silent") || Has(args, "/quiet");
+                Boot("args: report=" + report + " csv=" + csv + " silent=" + silent);
+
+                if (!string.IsNullOrEmpty(report) || !string.IsNullOrEmpty(csv))
+                {
+                    ScanResult r = Scanner.Run(null);
+                    Boot("scan done");
+                    if (!string.IsNullOrEmpty(report))
+                    {
+                        WriteText(report, Report.BuildHtml(r), true);
+                        LastReportPath = report;
+                    }
+                    if (!string.IsNullOrEmpty(csv))
+                    {
+                        WriteText(csv, Report.BuildCsv(r), true);
+                    }
+                    Boot("report written");
+                    return 0;
+                }
+
+                if (silent) return 0;
+
+                Boot("creating form");
+                string shot = Arg(args, "/shot");
+                int page = 0;
+                string pageArg = Arg(args, "/page");
+                int.TryParse(pageArg, out page);
+                if (!string.IsNullOrEmpty(shot))
+                {
+                    ScanResult sr = Scanner.Run(null);
+                        SanitizeForDemo(sr);                    using (Ui.MainForm f = new Ui.MainForm(page))
+                    {
+                        f.Size = new System.Drawing.Size(1220, 780);
+                        f.AutoScan = false;
+                        bool interactive = System.Diagnostics.Process.GetCurrentProcess().SessionId != 0;
+                        f.PerformLayout();
+                        if (interactive)
+                        {
+                            f.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
+                            f.Location = new System.Drawing.Point(-5000, -5000);
+                            f.ShowInTaskbar = false;
+                            f.Show();
+                        }
+                        else
+                        {
+                            f.CreateControl();
+                            MakeHandles(f);
+                        }
+                        f.ApplyForScreenshot(sr);
+                        f.ApplyDemoHeader();
+                        f.PerformLayout();
+                        Application.DoEvents();
+                        if (interactive) System.Threading.Thread.Sleep(250);
+                        using (System.Drawing.Bitmap bmp = new System.Drawing.Bitmap(f.Width, f.Height))
+                        {
+                            f.DrawToBitmap(bmp, new System.Drawing.Rectangle(0, 0, f.Width, f.Height));
+                            bmp.Save(shot, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                    }
+                    return 0;
+                }
+                Application.Run(new Ui.MainForm(page));
+                Boot("form closed");
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Boot("EXCEPTION: " + ex);
+                try
+                {
+                    string log = Path.Combine(Path.GetTempPath(), "1c-license-inspector-crash.log");
+                    File.AppendAllText(log, DateTime.Now.ToString("s") + " " + ex + Environment.NewLine, Encoding.UTF8);
+                }
+                catch { }
+                if (!Has(args, "/silent")) MessageBox.Show(ex.Message, "Инспектор лицензий 1С", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return 1;
+            }
+        }
+
+        public static void Boot(string text)
+        {
+            string[] paths = new string[]
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "boot.log"),
+                Path.Combine(Path.GetTempPath(), "1c-license-inspector-boot.log")
+            };
+            foreach (string p in paths)
+            {
+                try
+                {
+                    File.AppendAllText(p, DateTime.Now.ToString("HH:mm:ss.fff") + " " + text + Environment.NewLine);
+                    return;
+                }
+                catch { }
+            }
+        }
+
+        private static void SanitizeForDemo(ScanResult r)
+        {
+            string pc = r.System.ComputerName;
+            string os = r.System.OsCaption;
+            string user = r.System.UserName;
+            string domain = r.System.Domain;
+
+            r.System.ComputerName = "COMPUTER";
+            r.System.OsCaption = "Windows Server";
+            r.System.UserName = "user";
+            r.System.Domain = "WORKGROUP";
+            r.System.Processor = "Intel(R) Xeon(R) CPU";
+            r.System.Model = "";
+            r.System.Manufacturer = "";
+            r.MachineInfo = "COMPUTER · Windows Server · x64";
+
+            foreach (LogEntry e in r.Log)
+            {
+                if (string.IsNullOrEmpty(e.Text)) continue;
+                if (!string.IsNullOrEmpty(pc)) e.Text = e.Text.Replace(pc, "COMPUTER");
+                if (!string.IsNullOrEmpty(os)) e.Text = e.Text.Replace(os, "Windows Server");
+                if (!string.IsNullOrEmpty(user)) e.Text = e.Text.Replace(user, "user");
+                if (!string.IsNullOrEmpty(domain)) e.Text = e.Text.Replace(domain, "WORKGROUP");
+            }
+        }
+        private static void MakeHandles(System.Windows.Forms.Control c)
+        {
+            try
+            {
+                c.CreateControl();
+                foreach (System.Windows.Forms.Control child in c.Controls) MakeHandles(child);
+            }
+            catch { }
+        }
+        private static string Arg(string[] args, string name)
+        {
+            for (int i = 0; i < args.Length; i++)
+            {
+                string a = args[i];
+                if (a.StartsWith(name + ":", StringComparison.OrdinalIgnoreCase)) return a.Substring(name.Length + 1).Trim('"');
+                if (string.Equals(a, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (i + 1 < args.Length && !args[i + 1].StartsWith("/", StringComparison.Ordinal)) return args[i + 1].Trim('"');
+                    return "";
+                }
+            }
+            return "";
+        }
+
+        private static bool Has(string[] args, string name)
+        {
+            foreach (string a in args)
+            {
+                if (string.Equals(a, name, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
+        }
+
+        public static void WriteText(string path, string text, bool utf8Bom)
+        {
+            string dir = Path.GetDirectoryName(Path.GetFullPath(path));
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            Encoding enc = utf8Bom ? new UTF8Encoding(true) : new UTF8Encoding(false);
+            File.WriteAllText(path, text, enc);
+        }
+    }
+}
+

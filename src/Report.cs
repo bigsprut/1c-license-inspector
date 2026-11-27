@@ -1,0 +1,274 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace OneCLicenseInspector
+{
+    internal static class Report
+    {
+        public static string BuildHtml(ScanResult r)
+        {
+            StringBuilder b = new StringBuilder(64 * 1024);
+            b.AppendLine("<!DOCTYPE html>");
+            b.AppendLine("<html lang=\"ru\"><head><meta charset=\"utf-8\">");
+            b.AppendLine("<title>Лицензии 1С — " + H(r.System.ComputerName) + "</title>");
+            b.AppendLine("<style>");
+            b.AppendLine("body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f4f6f8;color:#1e2a36;margin:0;padding:28px 36px 60px;font-size:14px}");
+            b.AppendLine(".head{background:#1b2733;color:#fff;border-radius:10px;padding:22px 26px;margin-bottom:22px}");
+            b.AppendLine(".head h1{margin:0 0 6px;font-size:22px;font-weight:600}");
+            b.AppendLine(".head .sub{color:#a9b7c6;font-size:13px}");
+            b.AppendLine(".cards{display:flex;gap:14px;margin:18px 0 26px;flex-wrap:wrap}");
+            b.AppendLine(".card{flex:1 1 180px;background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px 16px;border-left:4px solid #e3a33c}");
+            b.AppendLine(".card .n{font-size:26px;font-weight:600;color:#1b2733}");
+            b.AppendLine(".card .l{color:#6b7a8a;font-size:12px;margin-top:2px}");
+            b.AppendLine("h2{font-size:17px;margin:28px 0 10px;color:#1b2733;font-weight:600}");
+            b.AppendLine("table{border-collapse:collapse;width:100%;background:#fff;border:1px solid #e1e6eb;font-size:13px}");
+            b.AppendLine("th{background:#eef1f4;color:#46586a;text-align:left;padding:8px 10px;font-weight:600;border-bottom:1px solid #e1e6eb;white-space:nowrap}");
+            b.AppendLine("td{padding:7px 10px;border-bottom:1px solid #eef1f4;vertical-align:top}");
+            b.AppendLine("tr:last-child td{border-bottom:none}");
+            b.AppendLine("tr:nth-child(even) td{background:#fafbfc}");
+            b.AppendLine(".muted{color:#6b7a8a}");
+            b.AppendLine(".pill{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600}");
+            b.AppendLine(".ok{background:#e6f3ec;color:#2e7d5b}.warn{background:#fdf0dc;color:#a5701f}.bad{background:#fbe9e7;color:#b33a2b}.info{background:#e9eef5;color:#3d5a80}");
+            b.AppendLine(".warnbox{background:#fff;border:1px solid #f0d9b5;border-left:4px solid #e3a33c;border-radius:6px;padding:12px 14px;margin:10px 0}");
+            b.AppendLine(".note{color:#6b7a8a;font-size:12px;margin:8px 0 0}");
+            b.AppendLine("pre{background:#fff;border:1px solid #e1e6eb;border-radius:6px;padding:12px;white-space:pre-wrap;font-size:12px;color:#33465a}");
+            b.AppendLine(".foot{margin-top:34px;color:#8a99a8;font-size:12px}");
+            b.AppendLine("</style></head><body>");
+
+            b.AppendLine("<div class=\"head\">");
+            b.AppendLine("<h1>Инспектор лицензий 1С</h1>");
+            b.AppendLine("<div class=\"sub\">" + H(r.System.ComputerName) + " · " + H(r.System.OsCaption) + " " + H(r.System.OsArch) +
+                        " · отчёт от " + H(Fmt.Date(r.Finished)) + "</div>");
+            b.AppendLine("</div>");
+
+            b.AppendLine("<div class=\"cards\">");
+            Card(b, r.Platforms.Count.ToString(), "платформ 1С");
+            Card(b, r.Sentinel.Keys.Count.ToString(), "аппаратных ключей");
+            Card(b, r.Sentinel.Features.Count.ToString(), "компонентов лицензий");
+            Card(b, r.LicenseFiles.Count.ToString(), "файлов лицензий");
+            Card(b, r.TotalSeats() > 0 ? r.TotalFreeSeats() + " из " + r.TotalSeats() : "—", "свободно мест");
+            b.AppendLine("</div>");
+
+            if (r.Warnings.Count > 0)
+            {
+                b.AppendLine("<h2>Предупреждения</h2>");
+                foreach (Warning w in r.Warnings)
+                {
+                    string cls = w.Level == LogLevel.Error ? "bad" : (w.Level == LogLevel.Warn ? "warn" : "info");
+                    b.AppendLine("<div class=\"warnbox\"><b>" + H(w.Title) + "</b><br>" + H(w.Text) + "</div>");
+                }
+            }
+
+            b.AppendLine("<h2>Компьютер</h2>");
+            b.AppendLine("<table>");
+            Row(b, "Имя компьютера", r.System.ComputerName);
+            Row(b, "Операционная система", r.System.OsCaption + " " + r.System.OsArch);
+            Row(b, "Версия / сборка", r.System.OsBuild);
+            Row(b, "Установлена", r.System.OsInstallDate);
+            Row(b, "Процессор", r.System.Processor + " (" + r.System.CpuCount + " ядер)");
+            Row(b, "Память", Fmt.Bytes(r.System.RamBytes));
+            Row(b, "Платформа .NET", r.System.DotNet);
+            Row(b, "Пользователь", r.System.Domain + "\\" + r.System.UserName + (r.System.IsAdmin ? " (администратор)" : ""));
+            b.AppendLine("</table>");
+
+            b.AppendLine("<h2>Платформы 1С</h2>");
+            if (r.Platforms.Count == 0)
+            {
+                b.AppendLine("<p class=\"muted\">Не обнаружены.</p>");
+            }
+            else
+            {
+                b.AppendLine("<table><tr><th>Семейство</th><th>Версия</th><th>Разрядность</th><th>Поставка</th><th>Компоненты</th><th>Путь</th></tr>");
+                foreach (PlatformInfo p in r.Platforms)
+                {
+                    b.AppendLine("<tr><td>" + H(p.Family) + "</td><td><b>" + H(p.Version) + "</b></td><td>" + H(p.Bitness) +
+                                "</td><td>" + H(p.Delivery) + "</td><td>" + H(p.Components) + "</td><td class=\"muted\">" + H(p.Path) + "</td></tr>");
+                }
+                b.AppendLine("</table>");
+            }
+
+            b.AppendLine("<h2>Аппаратные ключи Sentinel LDK / HASP HL</h2>");
+            if (!r.Sentinel.Available)
+            {
+                b.AppendLine("<p class=\"muted\">Менеджер лицензий Sentinel LDK не отвечает: " + H(r.Sentinel.Error) + "</p>");
+            }
+            else if (r.Sentinel.Keys.Count == 0)
+            {
+                b.AppendLine("<p class=\"muted\">Ключей не найдено. Менеджер лицензий работает: " + H(r.Sentinel.Version) + "</p>");
+            }
+            else
+            {
+                b.AppendLine("<table><tr><th>Ключ (ID)</th><th>Название</th><th>Тип</th><th>Расположение</th><th>Прошивка</th><th>Сеансов</th></tr>");
+                foreach (SentinelKey k in r.Sentinel.Keys)
+                {
+                    b.AppendLine("<tr><td><b>" + H(k.Id) + "</b></td><td>" + H(k.Name) + "</td><td>" + H(k.TypeName) +
+                                "</td><td>" + H(k.Location) + "</td><td>" + H(k.Firmware) + "</td><td>" + H(k.Sessions) + "</td></tr>");
+                }
+                b.AppendLine("</table>");
+
+                b.AppendLine("<h2>Компоненты лицензий (места)</h2>");
+                b.AppendLine("<table><tr><th>Ключ</th><th>ID компонента</th><th>Название</th><th>Продукт</th><th>Тип</th><th>Занято</th><th>Всего</th><th>Свободно</th><th>Ограничение</th></tr>");
+                foreach (SentinelFeature f in r.Sentinel.Features)
+                {
+                    string free = f.IsUnlimited ? "не ограничено" : f.FreeSeats.ToString();
+                    b.AppendLine("<tr><td>" + H(f.KeyId) + "</td><td>" + H(f.FeatureId) + "</td><td>" + H(f.Name) + "</td><td>" + H(f.ProductName) +
+                                "</td><td>" + H(f.Type) + "</td><td>" + H(f.Logins) + "</td><td>" + H(f.IsUnlimited ? "∞" : f.Limit) +
+                                "</td><td>" + H(free) + "</td><td>" + H(f.ExpireText) + "</td></tr>");
+                }
+                b.AppendLine("</table>");
+            }
+
+            b.AppendLine("<h2>Устаревший менеджер HASP4 Net (1С 7.7 / 8.2)</h2>");
+            b.AppendLine("<table>");
+            Row(b, "Служба", r.Hasp4.ServiceInstalled ? (r.Hasp4.ServiceName + (r.Hasp4.ServiceRunning ? " — работает" : " — остановлена")) : "не установлена");
+            Row(b, "Версия менеджера", string.IsNullOrEmpty(r.Hasp4.Version) ? "—" : r.Hasp4.Version);
+            Row(b, "Порт 475", r.Hasp4.PortListening ? "прослушивается" : "закрыт");
+            Row(b, "Параметры", r.Hasp4.IniSummary);
+            Row(b, "Файл настроек 1С", r.Hasp4.NethaspIni);
+            b.AppendLine("</table>");
+            if (!string.IsNullOrEmpty(r.Hasp4.Comment)) b.AppendLine("<p class=\"note\">" + H(r.Hasp4.Comment) + "</p>");
+
+            b.AppendLine("<h2>Программные лицензии</h2>");
+            if (r.LicenseStorages.Count > 0)
+            {
+                b.AppendLine("<p class=\"muted\">Каталоги поиска: " + H(string.Join("; ", r.LicenseStorages.ToArray())) + "</p>");
+            }
+            if (r.LicenseFiles.Count == 0)
+            {
+                b.AppendLine("<p class=\"muted\">Файлы *.lic не обнаружены.</p>");
+            }
+            else
+            {
+                b.AppendLine("<table><tr><th>Файл</th><th>Активирована</th><th>Размер</th><th>Формат</th><th>SHA-1</th><th>Каталог</th></tr>");
+                foreach (LicenseFileInfo f in r.LicenseFiles)
+                {
+                    b.AppendLine("<tr><td><b>" + H(f.FileName) + "</b></td><td>" + H(f.Activated) + "</td><td>" + H(Fmt.Bytes(f.Size)) +
+                                "</td><td>" + H(f.Format) + "</td><td class=\"muted\">" + H(f.Sha1) + "</td><td class=\"muted\">" + H(f.Directory) + "</td></tr>");
+                }
+                b.AppendLine("</table>");
+            }
+            if (!string.IsNullOrEmpty(r.HostId))
+            {
+                b.AppendLine("<p class=\"note\">Идентификатор компьютера для привязки лицензий: <code>" + H(r.HostId) + "</code></p>");
+            }
+
+            if (!string.IsNullOrEmpty(r.LicenseRing))
+            {
+                b.AppendLine("<p class=\"note\">Утилита лицензирования: <code>" + H(r.LicenseRing) + "</code></p>");
+                if (!string.IsNullOrEmpty(r.LicenseRingOutput))
+                {
+                    b.AppendLine("<pre>" + H(r.LicenseRingOutput) + "</pre>");
+                }
+            }
+            else
+            {
+                b.AppendLine("<p class=\"note\">Утилита лицензирования 1С (ring) не найдена. PIN, редакцию и число мест по файлам *.lic показывает только она (или диалог «Справка → О программе» в самой 1С).</p>");
+            }
+            b.AppendLine("<h2>Службы</h2>");
+            b.AppendLine("<table><tr><th>Служба</th><th>Отображаемое имя</th><th>Состояние</th><th>Запуск</th></tr>");
+            foreach (ServiceInfo s in r.Services)
+            {
+                b.AppendLine("<tr><td>" + H(s.Name) + "</td><td>" + H(s.DisplayName) + "</td><td>" + H(s.State) + "</td><td>" + H(s.StartMode) + "</td></tr>");
+            }
+            b.AppendLine("</table>");
+
+            b.AppendLine("<h2>Процессы 1С и HASP</h2>");
+            b.AppendLine("<table><tr><th>Процесс</th><th>PID</th><th>Память</th><th>Запущен</th><th>Путь</th></tr>");
+            foreach (ProcessInfo p in r.Processes)
+            {
+                b.AppendLine("<tr><td>" + H(p.Name) + "</td><td>" + p.Pid + "</td><td>" + H(Fmt.Bytes(p.WorkingSet)) +
+                            "</td><td>" + H(p.Started) + "</td><td class=\"muted\">" + H(p.Path) + "</td></tr>");
+            }
+            b.AppendLine("</table>");
+
+            b.AppendLine("<h2>Сетевые порты</h2>");
+            b.AppendLine("<table><tr><th>Порт</th><th>Протокол</th><th>Процесс</th><th>PID</th><th>Назначение</th></tr>");
+            foreach (PortInfo p in r.Ports)
+            {
+                if (p.Role.Length == 0 && p.Port < 1024) continue;
+                b.AppendLine("<tr><td><b>" + p.Port + "</b></td><td>" + H(p.Protocol) + "</td><td>" + H(p.Owner) + "</td><td>" + p.Pid + "</td><td class=\"muted\">" + H(p.Role) + "</td></tr>");
+            }
+            b.AppendLine("</table>");
+
+            b.AppendLine("<h2>Журнал сбора данных</h2>");
+            b.AppendLine("<pre>");
+            foreach (LogEntry e in r.Log)
+            {
+                b.AppendLine(H(e.Time.ToString("HH:mm:ss")) + "  " + LevelText(e.Level) + "  [" + H(e.Source) + "] " + H(e.Text));
+            }
+            b.AppendLine("</pre>");
+
+            b.AppendLine("<div class=\"foot\">Отчёт сформирован программой «Инспектор лицензий 1С» " + H(Program.Version) + " · " + H(Fmt.Date(r.Finished)) + "</div>");
+            b.AppendLine("</body></html>");
+            return b.ToString();
+        }
+
+        public static string BuildCsv(ScanResult r)
+        {
+            StringBuilder b = new StringBuilder();
+            b.AppendLine("Раздел;Параметр;Значение");
+            Csv(b, "Компьютер", "Имя", r.System.ComputerName);
+            Csv(b, "Компьютер", "ОС", r.System.OsCaption + " " + r.System.OsArch);
+            Csv(b, "Компьютер", "Сборка", r.System.OsBuild);
+            Csv(b, "Компьютер", "Процессор", r.System.Processor);
+            Csv(b, "Компьютер", "Память", Fmt.Bytes(r.System.RamBytes));
+            Csv(b, "Компьютер", "Пользователь", r.System.Domain + "\\" + r.System.UserName);
+            foreach (PlatformInfo p in r.Platforms)
+            {
+                Csv(b, "Платформы", p.Family + " " + p.Version, p.Delivery + " | " + p.Components + " | " + p.Path);
+            }
+            foreach (SentinelKey k in r.Sentinel.Keys)
+            {
+                Csv(b, "Ключи", k.Id, k.Name + " | " + k.TypeName + " | " + k.Location);
+            }
+            foreach (SentinelFeature f in r.Sentinel.Features)
+            {
+                Csv(b, "Компоненты", f.KeyId + "/" + f.FeatureId, f.Name + " | занято " + f.Logins + " из " + (f.IsUnlimited ? "∞" : f.Limit));
+            }
+            foreach (LicenseFileInfo f in r.LicenseFiles)
+            {
+                Csv(b, "Лицензии", f.FileName, f.Directory + " | " + Fmt.Bytes(f.Size) + " | " + f.Format);
+            }
+            foreach (Warning w in r.Warnings)
+            {
+                Csv(b, "Предупреждения", w.Title, w.Text);
+            }
+            return b.ToString();
+        }
+
+        private static void Card(StringBuilder b, string number, string label)
+        {
+            b.AppendLine("<div class=\"card\"><div class=\"n\">" + H(number) + "</div><div class=\"l\">" + H(label) + "</div></div>");
+        }
+
+        private static void Row(StringBuilder b, string name, string value)
+        {
+            b.AppendLine("<tr><td class=\"muted\" style=\"width:220px\">" + H(name) + "</td><td>" + H(value) + "</td></tr>");
+        }
+
+        private static void Csv(StringBuilder b, string section, string name, string value)
+        {
+            b.AppendLine(Q(section) + ";" + Q(name) + ";" + Q(value));
+        }
+
+        private static string Q(string s)
+        {
+            if (s == null) s = "";
+            return "\"" + s.Replace("\"", "\"\"") + "\"";
+        }
+
+        private static string LevelText(LogLevel l)
+        {
+            if (l == LogLevel.Error) return "ОШИБКА";
+            if (l == LogLevel.Warn) return "ВНИМАНИЕ";
+            return "ИНФО";
+        }
+
+        public static string H(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            return s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
+        }
+    }
+}
