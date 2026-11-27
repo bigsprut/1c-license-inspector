@@ -22,6 +22,7 @@ namespace OneCLicenseInspector.Ui
         private TextBox _sessUser;
         private TextBox _sessPwd;
         private FlatButton _sessRefresh;
+        private FlatButton _sessImport;
         private ScanResult _result;
         private List<SessionEntry> _sessionItems = new List<SessionEntry>();
 
@@ -120,6 +121,15 @@ namespace OneCLicenseInspector.Ui
             _sessRefresh.Margin = new Padding(2, 2, 4, 2);
             _sessRefresh.Click += delegate { RefreshCluster(); };
             top.Controls.Add(_sessRefresh);
+
+            _sessImport = new FlatButton();
+            _sessImport.Text = "Из консоли 8.2";
+            _sessImport.Icon = "file";
+            _sessImport.Kind = ButtonKind.Secondary;
+            _sessImport.Size = new Size(160, 30);
+            _sessImport.Margin = new Padding(2, 2, 4, 2);
+            _sessImport.Click += delegate { ImportConsole82(); };
+            top.Controls.Add(_sessImport);
 
             _sessHint = new Label();
             _sessHint.Dock = DockStyle.Bottom;
@@ -246,6 +256,57 @@ namespace OneCLicenseInspector.Ui
             BindSessions();
         }
 
+        private void ImportConsole82()
+        {
+            string text = "";
+            try { if (Clipboard.ContainsText()) text = Clipboard.GetText(); }
+            catch { }
+            if (string.IsNullOrEmpty(text))
+            {
+                MessageBox.Show("Скопируйте таблицу сеансов в консоли администрирования 1С 8.2 (выделить → Ctrl+C) и нажмите кнопку снова.");
+                return;
+            }
+            List<Console82Import.Row> parsed = Console82Import.Parse(text);
+            if (parsed.Count == 0)
+            {
+                MessageBox.Show("В буфере обмена нет таблицы сеансов 1С 8.2.");
+                return;
+            }
+            if (_result == null) return;
+            _result.Cluster.Sessions.Clear();
+            List<SessionRow> rows = new List<SessionRow>();
+            foreach (Console82Import.Row pr in parsed)
+            {
+                SessionRow row = new SessionRow();
+                row.User = string.IsNullOrEmpty(pr.User) ? "—" : pr.User;
+                row.Host = pr.Host;
+                row.AppId = pr.App;
+                row.StartedAt = pr.Started;
+                row.License = string.IsNullOrEmpty(pr.License) ? "—" : pr.License;
+                row.Seats = "";
+                rows.Add(row);
+
+                SessionEntry se = new SessionEntry();
+                se.SessionId = pr.Session;
+                se.User = pr.User;
+                se.Host = pr.Host;
+                se.AppId = pr.App;
+                se.StartedAt = pr.Started;
+                se.LicenseShort = pr.License;
+                se.Infobase = pr.Infobase;
+                _result.Cluster.Sessions.Add(se);
+            }
+            _result.Cluster.Available = true;
+            _result.Cluster.Error = "";
+            _result.Cluster.Endpoint = "консоль 8.2";
+            _sessionItems = _result.Cluster.Sessions;
+
+            _sessions.DataSource = null;
+            _sessions.DataSource = rows;
+            _sessHint.Text = "Импорт из консоли 8.2: " + Console82Import.Summary(parsed);
+            if (rows.Count > 0) _sessions.Rows[0].Selected = true;
+            ShowSessionDetails();
+        }
         private void BindSessions()
         {
             if (_result == null) return;

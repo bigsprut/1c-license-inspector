@@ -109,7 +109,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.2.3";
+        public const string Version = "1.3.0";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -167,6 +167,17 @@ namespace OneCLicenseInspector
                 DebugLog = Has(args, "/debug");
                 Boot("text rendering ok");
 
+                string imp82 = Arg(args, "/imp82");
+                if (!string.IsNullOrEmpty(imp82))
+                {
+                    string txt = File.ReadAllText(imp82, Encoding.UTF8);
+                    List<Console82Import.Row> rows = Console82Import.Parse(txt);
+                    string summary = Console82Import.Summary(rows);
+                    string outPath = Arg(args, "/impout");
+                    if (!string.IsNullOrEmpty(outPath)) File.WriteAllText(outPath, summary, Encoding.UTF8);
+                    else Console.WriteLine(summary);
+                    return 0;
+                }
                 string licFile = Arg(args, "/lic");
                 if (!string.IsNullOrEmpty(licFile))
                 {
