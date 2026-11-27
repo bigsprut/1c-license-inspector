@@ -192,7 +192,7 @@ namespace OneCLicenseInspector.Ui
             _procs.Columns.Add(Col("PID", "Pid", 60));
             _procs.Columns.Add(Col("Память, KB", "Memory", 85));
             _procs.Columns.Add(Col("Лицензия", "License", 80));
-            _procs.Columns.Add(Col("PIN", "Pin", 110));
+            _procs.Columns.Add(Col("Рег. номер", "Pin", 110));
             _procs.Columns.Add(Col("Мест", "Seats", 60));
             _procs.Columns.Add(Col("Занято", "Used", 60));
             _procs.Columns.Add(Col("Свободно", "Free", 60));
@@ -207,7 +207,7 @@ namespace OneCLicenseInspector.Ui
             _sessions.Columns.Add(Col("Пользователь", "User", 130));
             _sessions.Columns.Add(Col("Приложение", "AppId", 110));
             _sessions.Columns.Add(Col("Лицензия", "License", 80));
-            _sessions.Columns.Add(Col("PIN", "Pin", 110));
+            _sessions.Columns.Add(Col("Рег. номер", "Pin", 110));
             _sessions.Columns.Add(Col("Мест", "Seats", 60));
             _sessions.Columns.Add(Col("Занято", "Used", 60));
             _sessions.Columns.Add(Col("Свободно", "Free", 60));

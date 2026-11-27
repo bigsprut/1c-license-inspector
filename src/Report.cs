@@ -270,7 +270,7 @@ namespace OneCLicenseInspector
             if (r.Cluster != null && r.Cluster.Processes.Count > 0)
             {
                 b.AppendLine("<h3>Рабочие процессы — использование серверной лицензии</h3>");
-                b.AppendLine("<table><tr><th>Компьютер</th><th>Порт</th><th>PID</th><th>Лицензия</th><th>PIN</th><th>Мест</th><th>Свободно</th></tr>");
+                b.AppendLine("<table><tr><th>Компьютер</th><th>Порт</th><th>PID</th><th>Лицензия</th><th>Рег. номер</th><th>Мест</th><th>Свободно</th></tr>");
                 foreach (SessionEntry ps in r.Cluster.Processes)
                 {
                     string pk, pp; int pu, pt;
@@ -298,7 +298,7 @@ namespace OneCLicenseInspector
                 if (imported)
                 {
                     b.AppendLine("<p class=\"note\">Источник: импорт таблицы из консоли администрирования 1С 8.2.</p>");
-                    b.AppendLine("<table><tr><th>Пользователь</th><th>Компьютер</th><th>Приложение</th><th>База</th><th>Начало</th><th>Лицензия</th><th>PIN</th><th>Мест</th><th>Свободно</th></tr>");
+                    b.AppendLine("<table><tr><th>Пользователь</th><th>Компьютер</th><th>Приложение</th><th>База</th><th>Начало</th><th>Лицензия</th><th>Рег. номер</th><th>Мест</th><th>Свободно</th></tr>");
                     foreach (SessionEntry s in r.Cluster.Sessions)
                     {
                         string kind, pin; int used, total;

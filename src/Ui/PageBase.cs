@@ -44,7 +44,7 @@ namespace OneCLicenseInspector.Ui
             foreach (LicenseFileInfo lf in r.LicenseFiles)
             {
                 users += lf.UsersNum;
-                b.AppendLine("  " + lf.FileName + " · PIN " + lf.Pin + " · " + lf.Product + " · " + lf.LicenseType +
+                b.AppendLine("  " + lf.FileName + " · рег. номер " + lf.Pin + " · " + lf.Product + " · " + lf.LicenseType +
                              " · пользователей: " + lf.Users + " · " + lf.Expires) ;
                 b.AppendLine("    привязка: " + lf.BoundTo);
             }
