@@ -125,6 +125,9 @@ namespace OneCLicenseInspector.Ui
             _sessRefresh.Size = new Size(132, 30);
             _sessRefresh.Margin = new Padding(2, 2, 4, 2);
             _sessRefresh.Click += delegate { RefreshCluster(); };
+            _sessServer.TextChanged += delegate { Program.RasEndpoint = _sessServer.Text.Trim(); };
+            _sessUser.TextChanged += delegate { Program.ClusterUser = _sessUser.Text.Trim(); };
+            _sessPwd.TextChanged += delegate { Program.ClusterPwd = _sessPwd.Text; };
             top.Controls.Add(_sessRefresh);
 
             _sessImport = new FlatButton();

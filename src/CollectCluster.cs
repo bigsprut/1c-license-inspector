@@ -157,7 +157,10 @@ namespace OneCLicenseInspector
             c.Available = true;
 
             string output, errorText;
-            int code = Exec.Run(c.RacPath, endpoint + " cluster list", 6000, out output, out errorText);
+            string clArgs = endpoint + " cluster list";
+            if (!string.IsNullOrEmpty(user)) clArgs += " --cluster-user=\"" + user + "\"";
+            if (!string.IsNullOrEmpty(password)) clArgs += " --cluster-pwd=\"" + password + "\"";
+            int code = Exec.Run(c.RacPath, clArgs, 6000, out output, out errorText);
             c.Raw = output;
             if (code != 0 || LooksLikeError(output, errorText))
             {
