@@ -157,10 +157,7 @@ namespace OneCLicenseInspector
             c.Available = true;
 
             string output, errorText;
-            string clArgs = endpoint;
-            if (!string.IsNullOrEmpty(user)) clArgs += " --cluster-user=\"" + user + "\"";
-            if (!string.IsNullOrEmpty(password)) clArgs += " --cluster-pwd=\"" + password + "\"";
-            clArgs += " cluster list";
+            string clArgs = endpoint + " cluster list";
             int code = Exec.Run(c.RacPath, clArgs, 6000, out output, out errorText);
             c.Raw = output;
             Diag.Log("rac cluster list: rc=" + code + " out=" + (output ?? "").Trim());
@@ -173,6 +170,7 @@ namespace OneCLicenseInspector
             }
 
             List<Record> clusters = ParseRecords(output, "cluster");
+            Diag.Log("rac clusters parsed=" + clusters.Count);
             foreach (Record rec in clusters)
             {
                 ClusterEntry e = new ClusterEntry();
@@ -203,6 +201,16 @@ namespace OneCLicenseInspector
                 int rc = Exec.Run(c.RacPath, args.ToString(), 10000, out so, out se);
                 Diag.Log("rac session list: rc=" + rc + " out=" + (so ?? "").Trim());
                 if (!string.IsNullOrEmpty(se)) Diag.Log("rac session list err: " + se.Trim());
+
+                // Если с правами не вышло — пробуем без них (кластер без пароля или rac не принимает параметры)
+                if ((rc != 0 || LooksLikeError(so, se)) && (!string.IsNullOrEmpty(user) || !string.IsNullOrEmpty(password)))
+                {
+                    string plainArgs = endpoint + " session list --cluster=" + e.Id + " --licenses";
+                    rc = Exec.Run(c.RacPath, plainArgs, 10000, out so, out se);
+                    Diag.Log("rac session list (без прав): rc=" + rc + " out=" + (so ?? "").Trim());
+                    if (!string.IsNullOrEmpty(se)) Diag.Log("rac session list (без прав) err: " + se.Trim());
+                }
+
                 if (rc != 0 || LooksLikeError(so, se))
                 {
                     c.Error = ShortError(so, se, rc);
