@@ -20,6 +20,8 @@ namespace OneCLicenseInspector.Ui
         private FlatButton _btnAcc;
         private int _lmRow;
         private int _haspRow;
+        private int _keysRow;
+        private int _featuresRow;
 
         public HardwarePage()
         {
@@ -34,10 +36,10 @@ namespace OneCLicenseInspector.Ui
             _keys.Columns.Add(Col("Название", "Name", 130));
             _keys.Columns.Add(Col("Тип", "TypeName", 120));
             _keys.Columns.Add(Col("Расположение", "Location", 90));
-            _keys.Columns.Add(Col("ПО", "Firmware", 60));
+            _keys.Columns.Add(Col("Прошивка", "Firmware", 70));
             _keys.Columns.Add(Col("Сеансов", "Sessions", 60));
             _keys.SelectionChanged += delegate { FilterFeatures(); };
-            AddRow(WithTitle("Ключи", Card(_keys, new Padding(1))), 150);
+            _keysRow = AddRow(WithTitle("Ключи", Card(_keys, new Padding(1))), 150);
             AddSpacer(6);
 
             _features = MakeGrid();
@@ -45,11 +47,11 @@ namespace OneCLicenseInspector.Ui
             _features.Columns.Add(Col("ID", "FeatureId", 45));
             _features.Columns.Add(Col("Компонент", "Name", 190));
             _features.Columns.Add(Col("Тип", "Type", 110));
-            _features.Columns.Add(Col("Зан.", "Logins", 55));
+            _features.Columns.Add(Col("Занято", "Logins", 60));
             _features.Columns.Add(Col("Всего", "Limit", 60));
-            _features.Columns.Add(Col("Своб.", "FreeText", 70));
+            _features.Columns.Add(Col("Свободно", "FreeText", 80));
             _features.Columns.Add(Col("Ограничение", "ExpireText", 105));
-            AddRow(WithTitle("Компоненты лицензий и свободные места", Card(_features, new Padding(1))), 210);
+            _featuresRow = AddRow(WithTitle("Компоненты лицензий и свободные места", Card(_features, new Padding(1))), 210);
             AddSpacer(6);
 
             _hasp4 = new KeyValueList();
@@ -192,17 +194,20 @@ namespace OneCLicenseInspector.Ui
                 kr.Id = k.Id;
                 kr.Name = string.IsNullOrEmpty(k.Name) ? k.Id : k.Name;
                 kr.TypeName = k.TypeName;
-                kr.Location = string.IsNullOrEmpty(k.Location) ? "Local" : k.Location;
+                kr.Location = LocalizeLocation(k.Location);
                 kr.Firmware = k.Firmware;
                 kr.Sessions = k.Sessions;
                 keyRows.Add(kr);
             }
             _keys.DataSource = null;
             _keys.DataSource = keyRows;
+            HideEmptyColumns(_keys, keyRows);
+            SetRowHeight(_keysRow, 30 + FitGridHeight(_keys, keyRows.Count, 96, 280));
             if (_keys.Rows.Count > 0) _keys.Rows[0].Selected = true;
 
             _featureItems = r.Sentinel.Features;
             FilterFeatures();
+            SetRowHeight(_featuresRow, 30 + FitGridHeight(_features, _features.Rows.Count, 110, 320));
 
             List<KeyValuePair<string, string>> h = new List<KeyValuePair<string, string>>();
             if (r.Hasp4.ServiceInstalled || r.Hasp4.PortListening)
@@ -377,12 +382,29 @@ namespace OneCLicenseInspector.Ui
                 row.Type = f.Type;
                 row.Logins = f.Logins;
                 row.Limit = f.IsUnlimited ? "∞" : f.Limit;
-                row.FreeText = f.IsUnlimited ? "не ограничено" : f.FreeSeats.ToString();
+                row.FreeText = f.IsUnlimited ? "∞" : f.FreeSeats.ToString();
                 row.ExpireText = string.IsNullOrEmpty(f.ExpireText) ? f.Restriction : f.ExpireText;
                 rows.Add(row);
             }
             _features.DataSource = null;
             _features.DataSource = rows;
+            HideEmptyColumns(_features, rows);
+            SetRowHeight(_featuresRow, 30 + FitGridHeight(_features, rows.Count, 110, 320));
+        }
+
+        /// <summary>
+        /// Sentinel отдаёт «Local»/«Remote» по-английски, а пустое поле раньше превращалось
+        /// в «Local» прямо в таблице. Показываем по-русски.
+        /// </summary>
+        private static string LocalizeLocation(string v)
+        {
+            string s = (v ?? "").Trim();
+            if (s.Length == 0) return "локальный";
+            if (s.Equals("local", StringComparison.OrdinalIgnoreCase)) return "локальный";
+            if (s.Equals("remote", StringComparison.OrdinalIgnoreCase)) return "сетевой";
+            if (s.Equals("network", StringComparison.OrdinalIgnoreCase)) return "сетевой";
+            if (s.Equals("any", StringComparison.OrdinalIgnoreCase)) return "любой";
+            return s;
         }
 
         public class FeatureRow

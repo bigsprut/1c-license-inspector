@@ -10,12 +10,16 @@ namespace OneCLicenseInspector.Ui
     {
         public static readonly Color Ink = Color.FromArgb(26, 38, 50);
         public static readonly Color InkSoft = Color.FromArgb(51, 70, 90);
-        public static readonly Color Muted = Color.FromArgb(107, 122, 138);
+        // Приглушённый текст: #6B7A8A давал контраст 4,1–4,4:1 при требовании WCAG AA 4,5:1
+        // для мелкого текста. #5F6E7E — 4,9–5,2:1 на белом и на подложке Canvas.
+        public static readonly Color Muted = Color.FromArgb(95, 110, 126);
         public static readonly Color Line = Color.FromArgb(227, 232, 237);
         public static readonly Color Canvas = Color.FromArgb(245, 247, 249);
         public static readonly Color Paper = Color.White;
         public static readonly Color Accent = Color.FromArgb(227, 163, 60);
         public static readonly Color AccentDark = Color.FromArgb(198, 137, 36);
+        // Тёмный янтарный для текста на светлом фоне: 5,9:1 на белом (AccentDark — только 3,0:1).
+        public static readonly Color AccentText = Color.FromArgb(138, 90, 18);
         public static readonly Color AccentSoft = Color.FromArgb(253, 243, 227);
         public static readonly Color Green = Color.FromArgb(46, 125, 91);
         public static readonly Color GreenSoft = Color.FromArgb(230, 243, 236);

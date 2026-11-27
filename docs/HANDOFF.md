@@ -8,7 +8,7 @@
 
 - Проект: `D:\work\Learn\DSHarness\1CCommon`
 - Репозиторий: https://github.com/bigsprut/1c-license-inspector (автор PrS <bigsprut@mail.ru>)
-- Текущая версия: **1.5.32**, релизы `v1.0.0`–`v1.5.32`
+- Текущая версия: **1.5.33**, релизы `v1.0.0`–`v1.5.33`
 - Сборка: `.\build.ps1` (csc .NET 4.0, `/codepage:65001`, AnyCPU)
 - Публикация: `.\tools\publish.ps1 -Message "…"` — сборка + скан секретов + commit + push.
   Пуш и релизы разрешены Сергеем постоянно.
@@ -85,9 +85,9 @@
 | `src/AutoDrop.cs` | выгрузка отчёта на `\\tsclient\…\drop` |
 | `src/ClusterCredentials.cs` | логин/пароль кластера, DPAPI (`pwd`, не `password` — скан секретов!) |
 | `src/Report.cs` | HTML/CSV + `BuildDigest` (дайджест с сырым rac и логом) |
-| `src/Ui/Pages/UsagePage.cs` | вкладка «Использование», поля прав, «Диагностика» |
+| `src/Ui/Pages/UsagePage.cs` | вкладка «Использование», поля прав, «Диагностика», журнал с фильтром |
 | `src/Console82Import.cs` | разбор TSV 8.2, `ParseLicenseFull` (тип/места/файл) |
-| `tools/Diag82Tree.cs` | обход всего дерева MMC (`diag82-tree.txt`) |
+| `tools/Diag82Tree.cs` | обход всего дерева MMC (`diag82-tree.txt`) || `docs/UI-AUDIT.md` | аудит дизайна и UI: дефекты, правки 1.5.33, что осталось || `src/Ui/Theme.cs`, `src/Ui/PageBase.cs` | палитра и типографика, общие помощники таблиц (`FitGridHeight`, `HideEmptyColumns`) |
 
 ## Грабли (не наступать снова)
 

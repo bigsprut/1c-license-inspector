@@ -168,7 +168,7 @@ namespace OneCLicenseInspector.Ui
                 r.LicenseFiles.Count > 0 ? Theme.Green : Theme.Muted,
                 "Программные лицензии",
                 r.LicenseFiles.Count > 0
-                    ? "Файлов *.lic: " + r.LicenseFiles.Count + ". Каталоги: " + string.Join(", ", r.LicenseStorages.ToArray())
+                    ? "Файлов *.lic: " + r.LicenseFiles.Count + ". Каталоги: " + Fmt.ShortList(r.LicenseStorages, 2)
                     : "Файлы программных лицензий не найдены ни в одном стандартном каталоге."));
 
             _status.Items = items;
@@ -187,7 +187,7 @@ namespace OneCLicenseInspector.Ui
             facts.Add(new KeyValuePair<string, string>("Компьютер", r.System.ComputerName + " (" + r.System.OsCaption + " " + r.System.OsArch + ")"));
             facts.Add(new KeyValuePair<string, string>("Лицензий в работе", r.Sentinel.Sessions.Count > 0 ? r.Sentinel.Sessions.Count + " сеансов" : "нет активных сеансов"));
             facts.Add(new KeyValuePair<string, string>("Файлов лицензий", r.LicenseFiles.Count.ToString()));
-            facts.Add(new KeyValuePair<string, string>("Каталоги лицензий", r.LicenseStorages.Count == 0 ? "—" : string.Join("; ", r.LicenseStorages.ToArray())));
+            facts.Add(new KeyValuePair<string, string>("Каталоги лицензий", r.LicenseStorages.Count == 0 ? "—" : Fmt.ShortList(r.LicenseStorages, 3)));
             facts.Add(new KeyValuePair<string, string>("Проверка выполнена", Fmt.Date(r.Finished) + " за " + Fmt.Duration(r.Finished - r.Started)));
             _facts.Set(facts);
         }

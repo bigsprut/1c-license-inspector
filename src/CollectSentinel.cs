@@ -163,7 +163,7 @@ namespace OneCLicenseInspector
                 key.VendorName = XmlUtil.Value(k, "vendorname");
                 key.VendorId = XmlUtil.Value(k, "vendorid");
                 key.Configuration = XmlUtil.Value(k, "configuration");
-                key.Location = XmlUtil.Value(k, "local");
+                key.Location = RuLocation(XmlUtil.Value(k, "local"));
                 key.Firmware = XmlUtil.Value(k, "firmware");
                 key.HwVersion = XmlUtil.Value(k, "hw_version");
                 key.Sessions = XmlUtil.Value(k, "sessioncount");
@@ -196,10 +196,10 @@ namespace OneCLicenseInspector
                 feat.Logins = XmlUtil.Value(f, "logincount");
                 feat.Limit = XmlUtil.Value(f, "loginlimit");
                 feat.Sessions = XmlUtil.Value(f, "sessioncount");
-                feat.ExpireText = XmlUtil.Value(f, "licenserestrictions_text");
+                feat.ExpireText = RuExpire(XmlUtil.Value(f, "licenserestrictions_text"));
                 feat.Disabled = XmlUtil.Value(f, "disabled");
                 feat.Unusable = XmlUtil.Value(f, "unusable");
-                feat.Restriction = XmlUtil.Value(f, "countingtext");
+                feat.Restriction = RuExpire(XmlUtil.Value(f, "countingtext"));
 
                 int n;
                 if (int.TryParse(feat.Logins, NumberStyles.Integer, CultureInfo.InvariantCulture, out n)) feat.LoginsNum = n;
@@ -242,6 +242,27 @@ namespace OneCLicenseInspector
                 s.Remaining = XmlUtil.Value(e, "remainingtimetext");
                 r.Sentinel.Sessions.Add(s);
             }
+        }
+
+        /// <summary>«local»/«remote» из Admin API → по-русски (в UI не должно быть английских слов).</summary>
+        private static string RuLocation(string v)
+        {
+            string s = (v ?? "").Trim();
+            if (s.Equals("local", StringComparison.OrdinalIgnoreCase)) return "локальный";
+            if (s.Equals("remote", StringComparison.OrdinalIgnoreCase)) return "сетевой";
+            if (s.Equals("network", StringComparison.OrdinalIgnoreCase)) return "сетевой";
+            if (s.Equals("any", StringComparison.OrdinalIgnoreCase)) return "любой";
+            return s;
+        }
+
+        /// <summary>«Perpetual»/«Expiring» и прочие значения лицензионных ограничений → по-русски.</summary>
+        internal static string RuExpire(string v)
+        {
+            string s = (v ?? "").Trim();
+            if (s.Equals("perpetual", StringComparison.OrdinalIgnoreCase)) return "бессрочно";
+            if (s.Equals("none", StringComparison.OrdinalIgnoreCase)) return "без ограничений";
+            if (s.Equals("expiring", StringComparison.OrdinalIgnoreCase)) return "ограниченный срок";
+            return s;
         }
     }
 }

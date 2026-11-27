@@ -94,9 +94,12 @@ namespace OneCLicenseInspector.Ui
 
             FlowLayoutPanel top = new FlowLayoutPanel();
             top.Dock = DockStyle.Top;
-            top.Height = 44;
+            // Кнопок и полей больше, чем помещается в одну строку (сервер, логин, пароль,
+            // «Опросить», «Диагностика», три действия для 8.2) — переносим на вторую строку,
+            // иначе правые кнопки уходят за край окна и становятся недоступны.
+            top.Height = 84;
             top.Padding = new Padding(6, 6, 6, 4);
-            top.WrapContents = false;
+            top.WrapContents = true;
             top.BackColor = Color.White;
 
             top.Controls.Add(LabelFor("Сервер"));
@@ -131,7 +134,7 @@ namespace OneCLicenseInspector.Ui
             FlatButton diagBtn = new FlatButton();
             diagBtn.Text = "Диагностика";
             diagBtn.Icon = "file";
-            diagBtn.Kind = ButtonKind.Ghost;
+            diagBtn.Kind = ButtonKind.Link;
             diagBtn.Size = new Size(130, 30);
             diagBtn.Margin = new Padding(2, 2, 4, 2);
             diagBtn.Click += delegate { ShowDiagnostics(); };
@@ -164,7 +167,7 @@ namespace OneCLicenseInspector.Ui
             _sessConsole = new FlatButton();
             _sessConsole.Text = "Открыть консоль";
             _sessConsole.Icon = "key";
-            _sessConsole.Kind = ButtonKind.Ghost;
+            _sessConsole.Kind = ButtonKind.Link;
             _sessConsole.Size = new Size(150, 30);
             _sessConsole.Margin = new Padding(2, 2, 4, 2);
             _sessConsole.Click += delegate { OpenConsole82(); };
@@ -267,35 +270,8 @@ namespace OneCLicenseInspector.Ui
             return _sessPanel;
         }
 
-        /// <summary>
-        /// Прячет столбцы, в которых нет ни одного значения: у 8.3 часть полей (лицензии по rphost,
-        /// «Активен») отсутствует, и пустые столбцы только мешают читать таблицу.
-        /// </summary>
-        private static void HideEmptyColumns(DataGridView grid, System.Collections.IEnumerable rows)
+        private static Label LabelFor(string text)
         {
-            try
-            {
-                List<object> list = new List<object>();
-                if (rows != null) foreach (object o in rows) list.Add(o);
-                foreach (DataGridViewColumn col in grid.Columns)
-                {
-                    string prop = col.DataPropertyName;
-                    if (string.IsNullOrEmpty(prop)) continue;
-                    bool any = false;
-                    foreach (object o in list)
-                    {
-                        System.Reflection.PropertyInfo pi = o.GetType().GetProperty(prop);
-                        if (pi == null) { any = true; break; }
-                        object v = pi.GetValue(o, null);
-                        if (v != null && v.ToString().Trim().Length > 0) { any = true; break; }
-                    }
-                    col.Visible = any;
-                }
-            }
-            catch { }
-        }
-
-        private static Label LabelFor(string text)        {
             Label l = new Label();
             l.Text = text;
             l.AutoSize = true;
@@ -571,6 +547,7 @@ namespace OneCLicenseInspector.Ui
             {
                 _procs.Visible = showProcs;
                 if (_procsTitle != null) _procsTitle.Visible = showProcs;
+                if (showProcs) _procs.Height = FitGridHeight(_procs, prows.Count, 96, 240);
             }
             catch { }
 
@@ -579,7 +556,10 @@ namespace OneCLicenseInspector.Ui
             foreach (SessionEntry s in c.Sessions)
             {
                 SessionRow row = new SessionRow();
-                row.Infobase = ShortInfobase(s.Infobase);                row.SessionId = s.SessionId;
+                row.Infobase = ShortInfobase(s.Infobase);
+                // В консоли администрирования у сеанса есть числовой номер; UUID в столбце
+                // обрезался в «aaaaaaaaa…» и ничего не говорил.
+                row.SessionId = string.IsNullOrEmpty(s.SessionNum) ? ShortId(s.SessionId) : s.SessionNum;
                 row.StartedAt = ShortDate(s.StartedAt);
                 row.Host = s.Host;
                 row.User = string.IsNullOrEmpty(s.User) ? "—" : s.User;
@@ -635,6 +615,13 @@ namespace OneCLicenseInspector.Ui
         {
             if (string.IsNullOrEmpty(s)) return "";
             return s.Length > 28 ? "…" + s.Substring(s.Length - 27) : s;
+        }
+
+        /// <summary>Короткий идентификатор для таблицы: первые 8 символов UUID.</summary>
+        private static string ShortId(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            return s.Length > 10 ? s.Substring(0, 8) + "…" : s;
         }
 
         private static string ShortDate(string s)
@@ -713,6 +700,12 @@ namespace OneCLicenseInspector.Ui
             f.Size = new Size(980, 640);
             f.MinimizeBox = false;
             f.MaximizeBox = true;
+            f.BackColor = Theme.Paper;
+            f.KeyPreview = true;
+            f.KeyDown += delegate (object s2, KeyEventArgs e2)
+            {
+                if (e2.KeyCode == Keys.Escape) f.Close();
+            };
 
             TextBox box = new TextBox();
             box.Multiline = true;
@@ -727,6 +720,7 @@ namespace OneCLicenseInspector.Ui
             Panel bar = new Panel();
             bar.Dock = DockStyle.Bottom;
             bar.Height = 46;
+            bar.BackColor = Theme.Paper;
 
             FlatButton folder = new FlatButton();
             folder.Text = "Открыть папку";
@@ -737,14 +731,14 @@ namespace OneCLicenseInspector.Ui
 
             FlatButton copy = new FlatButton();
             copy.Text = "Копировать";
-            copy.Kind = ButtonKind.Ghost;
+            copy.Kind = ButtonKind.Link;
             copy.Size = new Size(130, 30);
             copy.Location = new Point(170, 8);
             copy.Click += delegate { try { Clipboard.SetText(box.Text); } catch { } };
 
             FlatButton close = new FlatButton();
             close.Text = "Закрыть";
-            close.Kind = ButtonKind.Ghost;
+            close.Kind = ButtonKind.Secondary;
             close.Size = new Size(110, 30);
             close.Location = new Point(310, 8);
             close.Click += delegate { f.Close(); };
@@ -880,17 +874,31 @@ namespace OneCLicenseInspector.Ui
     internal class JournalPage : PageBase
     {
         private DataGridView _grid;
+        private int _gridRow;
+        private bool _onlyImportant;
 
         public JournalPage()
         {
             AddHeader("Журнал", "Что и откуда удалось прочитать при последнем сканировании");
 
+            // Без фильтра важные записи тонули среди «инфо» (24 строки про платформы подряд).
+            SegmentedTabs filter = new SegmentedTabs();
+            filter.Items.AddRange(new string[] { "Все записи", "Только важные" });
+            filter.SelectedIndex = 0;
+            filter.SelectedIndexChanged += delegate
+            {
+                _onlyImportant = filter.SelectedIndex == 1;
+                if (Snapshot != null) Bind(Snapshot);
+            };
+            AddRow(filter, 34);
+            AddSpacer(6);
+
             _grid = MakeGrid();
             _grid.Columns.Add(Col("Время", "TimeText", 72));
-            _grid.Columns.Add(Col("Уровень", "LevelText", 60));
+            _grid.Columns.Add(Col("Уровень", "LevelText", 66));
             _grid.Columns.Add(Col("Раздел", "Source", 90));
             _grid.Columns.Add(Col("Сообщение", "Text", 420));
-            AddRow(Card(_grid, new Padding(1)), 470);
+            _gridRow = AddRow(Card(_grid, new Padding(1)), 470);
         }
 
         private DataGridViewColumn Col(string header, string prop, int weight)
@@ -909,6 +917,7 @@ namespace OneCLicenseInspector.Ui
             List<Row> rows = new List<Row>();
             foreach (LogEntry e in r.Log)
             {
+                if (_onlyImportant && e.Level == LogLevel.Info) continue;
                 Row row = new Row();
                 row.TimeText = e.Time.ToString("HH:mm:ss");
                 row.LevelText = e.Level == LogLevel.Error ? "ошибка" : (e.Level == LogLevel.Warn ? "внимание" : "инфо");
@@ -916,8 +925,19 @@ namespace OneCLicenseInspector.Ui
                 row.Text = e.Text;
                 rows.Add(row);
             }
+            // Сначала ошибки и предупреждения — даже в режиме «Все записи» важное сверху.
+            rows.Sort(delegate (Row a, Row b)
+            {
+                int la = a.LevelText == "ошибка" ? 0 : (a.LevelText == "внимание" ? 1 : 2);
+                int lb = b.LevelText == "ошибка" ? 0 : (b.LevelText == "внимание" ? 1 : 2);
+                if (la != lb) return la.CompareTo(lb);
+                return string.Compare(a.TimeText, b.TimeText, StringComparison.Ordinal);
+            });
             _grid.DataSource = null;
             _grid.DataSource = rows;
+            // Журнал занимает всё доступное место, но не меньше 8 строк.
+            int h = FitGridHeight(_grid, rows.Count, 220, 2000);
+            SetRowHeight(_gridRow, Root.Height - 120 > h ? Root.Height - 120 : h);
         }
 
         public class Row

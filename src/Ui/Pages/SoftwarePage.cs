@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Text;
 using System.Windows.Forms;
 
 namespace OneCLicenseInspector.Ui
@@ -12,6 +13,9 @@ namespace OneCLicenseInspector.Ui
         private TextBox _hex;
         private TextBox _ring;
         private int _infoRow;
+        private int _gridRow;
+        private Panel _fileSection;
+        private int _ringRow;
         private List<LicenseFileInfo> _items = new List<LicenseFileInfo>();
         private Panel _hexCard;
 
@@ -32,7 +36,8 @@ namespace OneCLicenseInspector.Ui
             _grid.Columns.Add(Col("Срок", "Expires", 110));
             _grid.Columns.Add(Col("Каталог", "Directory", 220));
             _grid.SelectionChanged += delegate { ShowDetails(); };
-            AddRow(WithTitle("Файлы лицензий", Card(_grid, new Padding(1))), 176);
+            _fileSection = WithTitle("Файлы лицензий", Card(_grid, new Padding(1)));
+            _gridRow = AddRow(_fileSection, 176);
             AddSpacer(6);
 
             _hex = new TextBox();
@@ -59,7 +64,7 @@ namespace OneCLicenseInspector.Ui
             _ring.Font = Theme.MonoFont(8.5f);
             _ring.Dock = DockStyle.Fill;
             EnableCopy(_ring);
-            AddRow(WithTitle("Вывод утилиты лицензирования ring", Card(_ring, new Padding(10))), 126);
+            _ringRow = AddRow(WithTitle("Вывод утилиты лицензирования ring", Card(_ring, new Padding(10))), 126);
         }
 
         private DataGridViewColumn Col(string header, string prop, int weight)
@@ -128,7 +133,9 @@ namespace OneCLicenseInspector.Ui
             }
             string clientUsage = usedClient < 0
                 ? "нет данных (кластер недоступен)"
-                : usedClient + " из " + clientTotal + ", свободно " + Math.Max(0, clientTotal - usedClient);
+                : (clientTotal <= 0
+                    ? usedClient + " сеанс(ов), клиентских мест не найдено"
+                    : usedClient + " из " + clientTotal + ", свободно " + Math.Max(0, clientTotal - usedClient));
             bool serverRunning = false;
             foreach (ProcessInfo pi in r.Processes)
             {
@@ -140,12 +147,12 @@ namespace OneCLicenseInspector.Ui
             int usersSum = 0;
             foreach (LicenseFileInfo lf in r.LicenseFiles) usersSum += lf.UsersNum;
             info.Add(new KeyValuePair<string, string>("Лицензий всего",
-                "Лицензий: " + r.LicenseFiles.Count + " (клиентских мест: " + clientTotal + ", серверных: " + serverTotal + (otherTotal > 0 ? ", прочих: " + otherTotal : "") + ") · пользователей: " + usersSum));
-            info.Add(new KeyValuePair<string, string>("Занято / свободно (клиентские)", clientUsage));
+                r.LicenseFiles.Count + " · клиентских мест: " + clientTotal + " · серверных: " + serverTotal + (otherTotal > 0 ? " · прочих: " + otherTotal : "") + " · пользователей: " + usersSum));
+            info.Add(new KeyValuePair<string, string>("Занято / свободно", clientUsage));
             info.Add(new KeyValuePair<string, string>("Серверная лицензия", (serverTotal > 0 ? "есть (" + serverTotal + ")" : "не найдена") + (serverRunning ? " · сервер 1С запущен" : " · сервер 1С не запущен")));
             info.Add(new KeyValuePair<string, string>("Места в аппаратных ключах", seats));
             info.Add(new KeyValuePair<string, string>("Каталоги поиска",
-                r.LicenseStorages.Count == 0 ? "стандартные каталоги отсутствуют" : string.Join("; ", r.LicenseStorages.ToArray())));
+                r.LicenseStorages.Count == 0 ? "стандартные каталоги отсутствуют" : Fmt.ShortList(r.LicenseStorages, 3)));
             info.Add(new KeyValuePair<string, string>("Отпечаток ПК",
                 string.IsNullOrEmpty(r.HostId) ? "не найден (host_id отсутствует)" : Shorten(r.HostId, 140)));
             info.Add(new KeyValuePair<string, string>("Java для ring",
@@ -198,12 +205,34 @@ namespace OneCLicenseInspector.Ui
             _items = r.LicenseFiles;
             _grid.DataSource = null;
             _grid.DataSource = rows;
+            HideEmptyColumns(_grid, rows);
+            if (_fileSection != null) _fileSection.Visible = rows.Count > 0;
+            SetRowHeight(_gridRow, rows.Count > 0 ? 30 + FitGridHeight(_grid, rows.Count, 96, 300) : 0);
             if (rows.Count > 0) _grid.Rows[0].Selected = true;
             ShowDetails();
+
+            // Панель вывода ring подстраиваем под число строк — пустое поле на пол-экрана не нужно.
+            int ringLines = 3;
+            if (!string.IsNullOrEmpty(_ring.Text)) ringLines = _ring.Text.Replace("\r", "").Split('\n').Length;
+            SetRowHeight(_ringRow, 30 + Math.Max(64, Math.Min(220, ringLines * 14 + 26)));
         }
 
-        private static string Shorten(string s, int max)
+        /// <summary>Сменить заголовок секции, не пересобирая её (нужно для пустых состояний).</summary>
+        private static void SetSectionTitle(Panel section, string text)
         {
+            try
+            {
+                if (section == null) return;
+                foreach (Control c in section.Controls)
+                {
+                    SectionTitle st = c as SectionTitle;
+                    if (st != null) { st.Text2 = text; st.Invalidate(); return; }
+                }
+            }
+            catch { }
+        }
+
+        private static string Shorten(string s, int max)        {
             if (string.IsNullOrEmpty(s) || s.Length <= max) return s;
             return s.Substring(0, max) + "…";
         }
@@ -216,6 +245,7 @@ namespace OneCLicenseInspector.Ui
 
             if (f == null)
             {
+                SetSectionTitle(_hexCard, "Файлы программных лицензий");
                 _hex.Text = "Файлы программных лицензий не найдены.\r\n\r\n" +
                             "Возможные причины:\r\n" +
                             "  • лицензии аппаратные (ключ HASP) — тогда смотрите раздел «Аппаратные ключи»;\r\n" +
@@ -225,12 +255,33 @@ namespace OneCLicenseInspector.Ui
             }
 
             List<KeyValuePair<string, string>> kv = new List<KeyValuePair<string, string>>();
+            SetSectionTitle(_hexCard, "Содержимое файла лицензии — можно выделить и скопировать (Ctrl+C)");
             kv.Add(new KeyValuePair<string, string>("Файл", f.FullPath));
             kv.Add(new KeyValuePair<string, string>("Активирована", string.IsNullOrEmpty(f.Activated) ? "дата в имени файла не распознана" : f.Activated));
             kv.Add(new KeyValuePair<string, string>("Формат", f.Format + " · " + f.Note));
             kv.Add(new KeyValuePair<string, string>("SHA-1", f.Sha1));
-            _info.Set(kv);
-            _hex.Text = CollectLicenses.ReadText(f.FullPath);
+
+            // Верхнюю карточку со сводкой больше не затираем сведениями о файле: она про
+            // каталоги и привязку, а сведения о выбранном файле показываем над содержимым.
+            StringBuilder head = new StringBuilder();
+            foreach (KeyValuePair<string, string> pair in kv) head.AppendLine(pair.Key + ": " + pair.Value);
+            head.AppendLine();
+
+            bool binary = !string.IsNullOrEmpty(f.Format) &&
+                          f.Format.IndexOf("текст", StringComparison.OrdinalIgnoreCase) < 0;
+            if (binary)
+            {
+                // Двоичный файл нельзя показывать как текст — получается мусор вроде «яя<».
+                _hex.Text = head.ToString() +
+                            "Содержимое двоичное (" + Fmt.Bytes(f.Size) + "), как текст не отображается." + Environment.NewLine +
+                            "Первые байты: " + (string.IsNullOrEmpty(f.Preview) ? "—" : f.Preview) + Environment.NewLine + Environment.NewLine +
+                            "PIN, редакцию и число мест по такому файлу читает только сама платформа 1С" +
+                            " (или утилита ring, если она установлена).";
+            }
+            else
+            {
+                _hex.Text = head + CollectLicenses.ReadText(f.FullPath);
+            }
         }
 
         public class FileRow

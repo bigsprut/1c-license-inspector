@@ -31,8 +31,14 @@ namespace OneCLicenseInspector
 
                 foreach (string f in files)
                 {
+                    if (!IsLicExtension(f)) continue;
                     LicenseFileInfo info = ReadLicenseFile(f);
                     if (info == null) continue;
+                    if (!IsOneCLicense(info))
+                    {
+                        r.AddLog(LogLevel.Info, "Лицензии", "пропущен чужой файл: " + info.FullPath);
+                        continue;
+                    }
                     bool dup = false;
                     foreach (LicenseFileInfo x in r.LicenseFiles)
                     {
@@ -111,14 +117,45 @@ namespace OneCLicenseInspector
             {
                 foreach (string f in Directory.GetFiles(dir, "*.lic"))
                 {
+                    if (!IsLicExtension(f)) continue;
                     string full = Path.GetFullPath(f);
                     if (!seen.Add(full)) continue;
-                    r.LicenseFiles.Add(ReadLicenseFile(full));
+                    LicenseFileInfo info = ReadLicenseFile(full);
+                    if (info == null) continue;
+                    if (!IsOneCLicense(info)) continue;
+                    r.LicenseFiles.Add(info);
                     AddUniquePath(r.LicenseStorages, Path.GetDirectoryName(full));
                 }
                 foreach (string sub in Directory.GetDirectories(dir)) WalkForLicenses(sub, depth + 1, r, seen);
             }
             catch { }
+        }
+
+        /// <summary>
+        /// Windows-маска «*.lic» матчит и «*.license» (DOS-правило трёх символов), поэтому в отчёт
+        /// раньше попадали чужие файлы (например, лицензии JetBrains). Расширение проверяем строго.
+        /// </summary>
+        private static bool IsLicExtension(string path)
+        {
+            try { return string.Equals(Path.GetExtension(path), ".lic", StringComparison.OrdinalIgnoreCase); }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Настоящая ли это лицензия 1С. Признаки: имя вида «20210315022125.lic» (дата активации),
+        /// либо разобранный PIN/продукт, либо файл лежит в каталоге 1С (…\1C\licenses, …\1cv8\…).
+        /// </summary>
+        internal static bool IsOneCLicense(LicenseFileInfo info)
+        {
+            if (info == null) return false;
+            if (!IsLicExtension(info.FileName ?? info.FullPath)) return false;
+            if (Regex.IsMatch(info.FileName ?? "", @"^\d{14}\.lic$", RegexOptions.IgnoreCase)) return true;
+            if (!string.IsNullOrEmpty(info.Pin) || !string.IsNullOrEmpty(info.Product)) return true;
+            string dir = (info.Directory ?? "") + "\\" + (info.FullPath ?? "");
+            if (dir.IndexOf("\\1C\\", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (dir.IndexOf("\\1cv8", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (dir.IndexOf("\\1CE\\", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            return false;
         }
         private static List<string> BuildStorages()
         {

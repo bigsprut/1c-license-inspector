@@ -9,6 +9,7 @@ namespace OneCLicenseInspector.Ui
     {
         private DataGridView _grid;
         private KeyValueList _details;
+        private int _gridRow;
         private List<PlatformInfo> _items = new List<PlatformInfo>();
         private int _detailsRow;
 
@@ -30,7 +31,7 @@ namespace OneCLicenseInspector.Ui
                 if (p != null) OpenFolder(p.Path);
             };
 
-            AddRow(Card(_grid, new Padding(1)), 306);
+            _gridRow = AddRow(Card(_grid, new Padding(1)), 306);
             AddSpacer(10);
 
             _details = new KeyValueList();
@@ -86,6 +87,8 @@ namespace OneCLicenseInspector.Ui
             }
             _grid.DataSource = null;
             _grid.DataSource = rows;
+            HideEmptyColumns(_grid, rows);
+            SetRowHeight(_gridRow, FitGridHeight(_grid, rows.Count, 120, 420));
             if (_items.Count > 0) _grid.Rows[0].Selected = true;
             ShowDetails();
         }

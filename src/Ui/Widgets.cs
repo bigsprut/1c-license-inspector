@@ -43,7 +43,7 @@ namespace OneCLicenseInspector.Ui
             }
         }
     }
-    internal enum ButtonKind { Primary, Secondary, Ghost }
+    internal enum ButtonKind { Primary, Secondary, Ghost, Link }
 
     internal class FlatButton : Control
     {
@@ -54,16 +54,43 @@ namespace OneCLicenseInspector.Ui
 
         public FlatButton()
         {
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor | ControlStyles.Selectable, true);
             Cursor = Cursors.Hand;
             Font = Theme.BodyBold;
             Size = new Size(130, 34);
             BackColor = Color.Transparent;
+            TabStop = true;
+            AccessibleRole = AccessibleRole.PushButton;
+        }
+
+        protected override void OnTextChanged(EventArgs e)
+        {
+            base.OnTextChanged(e);
+            try { AccessibleName = Text; } catch { }
+        }
+
+        protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+        protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+
+        protected override bool IsInputKey(Keys keyData)
+        {
+            if (keyData == Keys.Space || keyData == Keys.Enter) return true;
+            return base.IsInputKey(keyData);
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Space || e.KeyCode == Keys.Enter)
+            {
+                OnClick(EventArgs.Empty);
+                e.Handled = true;
+            }
+            base.OnKeyDown(e);
         }
 
         protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
         protected override void OnMouseLeave(EventArgs e) { _hover = false; _down = false; Invalidate(); base.OnMouseLeave(e); }
-        protected override void OnMouseDown(MouseEventArgs e) { _down = true; Invalidate(); base.OnMouseDown(e); }
+        protected override void OnMouseDown(MouseEventArgs e) { _down = true; Focus(); Invalidate(); base.OnMouseDown(e); }
         protected override void OnMouseUp(MouseEventArgs e) { _down = false; Invalidate(); base.OnMouseUp(e); }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -83,6 +110,13 @@ namespace OneCLicenseInspector.Ui
             {
                 back = _hover ? Color.FromArgb(40, 255, 255, 255) : Color.Transparent;
                 fore = Color.White;
+                border = Color.Transparent;
+            }
+            else if (Kind == ButtonKind.Link)
+            {
+                // Кнопка-ссылка для светлых панелей: белый текст Ghost на белом не читался.
+                back = _hover ? Theme.AccentSoft : Color.Transparent;
+                fore = Theme.AccentText;
                 border = Color.Transparent;
             }
             else
@@ -109,6 +143,16 @@ namespace OneCLicenseInspector.Ui
             }
             TextRenderer.DrawText(g, Text, Font, new Rectangle(x, 0, Width - x - Dpi.S(g, 6), Height), fore,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+
+            if (Focused)
+            {
+                Rectangle fr = new Rectangle(Dpi.S(g, 3), Dpi.S(g, 3), Width - Dpi.S(g, 7), Height - Dpi.S(g, 7));
+                using (Pen p = new Pen(fore))
+                {
+                    p.DashStyle = DashStyle.Dot;
+                    g.DrawRectangle(p, fr);
+                }
+            }
         }
     }
 
@@ -120,10 +164,37 @@ namespace OneCLicenseInspector.Ui
 
         public NavButton()
         {
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
             Height = 42;
             Cursor = Cursors.Hand;
             Font = Theme.Body;
+            TabStop = true;
+            AccessibleRole = AccessibleRole.PageTab;
+        }
+
+        protected override void OnTextChanged(EventArgs e)
+        {
+            base.OnTextChanged(e);
+            try { AccessibleName = Text; } catch { }
+        }
+
+        protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+        protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+
+        protected override bool IsInputKey(Keys keyData)
+        {
+            if (keyData == Keys.Space || keyData == Keys.Enter) return true;
+            return base.IsInputKey(keyData);
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Space || e.KeyCode == Keys.Enter)
+            {
+                OnClick(EventArgs.Empty);
+                e.Handled = true;
+            }
+            base.OnKeyDown(e);
         }
 
         protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
@@ -151,6 +222,15 @@ namespace OneCLicenseInspector.Ui
             TextRenderer.DrawText(g, Text, Selected ? Theme.BodyBold : Theme.Body,
                 new Rectangle(Dpi.S(g, 42), 0, Width - Dpi.S(g, 50), Height), fore,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+
+            if (Focused)
+            {
+                using (Pen p = new Pen(Theme.AccentText))
+                {
+                    p.DashStyle = DashStyle.Dot;
+                    g.DrawRectangle(p, new Rectangle(Dpi.S(g, 4), Dpi.S(g, 4), Width - Dpi.S(g, 9), Height - Dpi.S(g, 9)));
+                }
+            }
         }
     }
 

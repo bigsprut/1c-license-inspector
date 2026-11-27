@@ -80,7 +80,7 @@ namespace OneCLicenseInspector
                             feat.ExpireText = Get(f, "lic");
                             feat.Disabled = Get(f, "dis");
                             feat.Unusable = Get(f, "unusable");
-                            feat.Restriction = Get(f, "cnt");
+                            feat.Restriction = CollectSentinel.RuExpire(Get(f, "cnt"));
                             int n;
                             if (int.TryParse(feat.Logins, NumberStyles.Integer, CultureInfo.InvariantCulture, out n)) feat.LoginsNum = n;
                             if (int.TryParse(feat.Limit, NumberStyles.Integer, CultureInfo.InvariantCulture, out n)) feat.LimitNum = n;

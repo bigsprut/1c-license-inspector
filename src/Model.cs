@@ -312,6 +312,7 @@ namespace OneCLicenseInspector
     public class SessionEntry
     {
         public string SessionId = "";
+        public string SessionNum = "";
         public string User = "";
         public string Host = "";
         public string AppId = "";

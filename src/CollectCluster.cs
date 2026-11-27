@@ -350,6 +350,7 @@ namespace OneCLicenseInspector
                     SessionEntry s = new SessionEntry();
                     s.ClusterName = e.Name;
                     s.SessionId = rec.Get("session");
+                    s.SessionNum = rec.Get("session-id");
                     s.User = rec.Get("user-name");
                     s.Host = rec.Get("host-name");
                     if (string.IsNullOrEmpty(s.Host)) s.Host = rec.Get("host");

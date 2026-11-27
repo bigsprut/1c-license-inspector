@@ -30,6 +30,25 @@ namespace OneCLicenseInspector
             return d.ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture);
         }
 
+        /// <summary>
+        /// Список в одну строку, но не «простынёй»: первые show элементов и «и ещё N».
+        /// Так длинные перечни каталогов больше не занимают полэкрана в карточках.
+        /// </summary>
+        public static string ShortList(IList<string> items, int show)
+        {
+            if (items == null || items.Count == 0) return "";
+            if (show < 1) show = 1;
+            StringBuilder b = new StringBuilder();
+            int n = Math.Min(show, items.Count);
+            for (int i = 0; i < n; i++)
+            {
+                if (i > 0) b.Append("; ");
+                b.Append(items[i]);
+            }
+            if (items.Count > n) b.Append(" и ещё ").Append(items.Count - n);
+            return b.ToString();
+        }
+
         public static string DateShort(DateTime d)
         {
             if (d.Year < 1980) return "";

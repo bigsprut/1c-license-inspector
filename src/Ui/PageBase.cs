@@ -221,6 +221,55 @@ namespace OneCLicenseInspector.Ui
             g.Columns.Add(c);
             return c;
         }
+
+        /// <summary>
+        /// Высота таблицы по числу строк: заголовок + строки + запас, в пределах min..max.
+        /// Раньше высоты были фиксированными (150/210 px) и под одной строкой оставалось
+        /// полэкрана пустого места.
+        /// </summary>
+        protected static int FitGridHeight(DataGridView g, int rows, int min, int max)
+        {
+            try
+            {
+                int header = g.ColumnHeadersHeight > 0 ? g.ColumnHeadersHeight : 28;
+                int rowH = g.RowTemplate.Height > 0 ? g.RowTemplate.Height : 24;
+                // после биндинга реальная высота строки точнее RowTemplate (учитывает обрезку текста)
+                if (g.Rows.Count > 0 && g.Rows[0].Height > 0) rowH = g.Rows[0].Height;
+                int h = header + rowH * Math.Max(1, rows) + 6;
+                if (h < min) h = min;
+                if (h > max) h = max;
+                return h;
+            }
+            catch { return min; }
+        }
+
+        /// <summary>
+        /// Прячет столбцы, в которых нет ни одного значения: на 8.3 часть полей отсутствует
+        /// (лицензии у рабочих процессов, «Активен»), и пустые столбцы мешают читать таблицу.
+        /// </summary>
+        protected static void HideEmptyColumns(DataGridView grid, System.Collections.IEnumerable rows)
+        {
+            try
+            {
+                List<object> list = new List<object>();
+                if (rows != null) foreach (object o in rows) list.Add(o);
+                foreach (DataGridViewColumn col in grid.Columns)
+                {
+                    string prop = col.DataPropertyName;
+                    if (string.IsNullOrEmpty(prop)) continue;
+                    bool any = false;
+                    foreach (object o in list)
+                    {
+                        System.Reflection.PropertyInfo pi = o.GetType().GetProperty(prop);
+                        if (pi == null) { any = true; break; }
+                        object v = pi.GetValue(o, null);
+                        if (v != null && v.ToString().Trim().Length > 0) { any = true; break; }
+                    }
+                    col.Visible = any;
+                }
+            }
+            catch { }
+        }
     }
 
     internal class StatusItem
