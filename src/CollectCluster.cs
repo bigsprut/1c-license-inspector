@@ -216,40 +216,70 @@ namespace OneCLicenseInspector
             {
                 string so = "", se = "";
                 int rc = -1;
-                string[][] creds = new string[][ ]
+                string loginUsed = "";
+
+                // Порядок попыток: новый синтаксис rac (8.3.24+: режим и команда первыми, адрес в конце),
+                // затем старый, затем логины из списка администраторов кластера.
+                // Важно: успешный ответ с пустым stdout — это тоже успех («сеансов нет»), раньше он
+                // затирался ошибкой следующей попытки и на экран выходило «не аутентифицирован».
+                string firstErrOut = null, firstErrText = null;
+                int firstErrCode = 0;
+                bool got = false;
+
+                string[][] creds = new string[][]
                 {
-                    new string[] { user, password },
+                    new string[] { user ?? "", password ?? "" },
                     new string[] { "", "" },
                     new string[] { "Администратор", "" },
                     new string[] { "Administrator", "" }
                 };
-                foreach (bool newStyle in new bool[] { true, false })
-                {
-                    foreach (string[] cr in creds)
-                    {
-                        StringBuilder a = new StringBuilder();
-                        if (!newStyle) a.Append(endpoint);
-                        a.Append(" session list --cluster=").Append(e.Id).Append(" --licenses");
-                        if (cr[0].Length > 0) a.Append(" --cluster-user=\"").Append(cr[0]).Append("\"");
-                        if (cr[1].Length > 0) a.Append(" --cluster-pwd=\"").Append(cr[1]).Append("\"");
-                        if (newStyle) a.Append(' ').Append(endpoint);
 
+                for (int pass = 0; pass < 4 && !got; pass++)
+                {
+                    bool newStyle = pass == 0 || pass == 2;
+                    string[][] variants = creds;
+                    if (pass >= 2)
+                    {
+                        variants = AdminNameCreds(r, c, e.Id, user, password);
+                        if (variants.Length == 0) continue;
+                    }
+
+                    foreach (string[] cr in variants)
+                    {
+                        string a = SessionArgs(endpoint, e.Id, cr[0], cr[1], newStyle);
                         string so2, se2;
-                        int rc2 = Exec.Run(c.RacPath, a.ToString(), 15000, out so2, out se2);
-                        Diag.Log("rac session list [" + (newStyle ? "new" : "old") + "," + (cr[0].Length == 0 ? "no-auth" : cr[0]) + "]: rc=" + rc2 + " out=" + (so2 ?? "").Trim());
+                        int rc2 = Exec.Run(c.RacPath, a, 15000, out so2, out se2);
+                        Diag.Log("rac session list [" + (newStyle ? "new" : "old") + "," +
+                                 (cr[0].Length == 0 ? "no-auth" : cr[0]) + "]: rc=" + rc2 + " out=" + (so2 ?? "").Trim());
                         if (!string.IsNullOrEmpty(se2)) Diag.Log("  err: " + se2.Trim());
 
-                        so = so2; se = se2; rc = rc2;
-                        if (rc2 == 0 && !LooksLikeError(so2, se2) && (so2 ?? "").Trim().Length > 10) break;
+                        if (rc2 == 0 && !LooksLikeError(so2, se2))
+                        {
+                            got = true;
+                            so = so2; se = se2; rc = rc2; loginUsed = cr[0];
+                            break;
+                        }
+                        if (firstErrOut == null)
+                        {
+                            firstErrOut = so2; firstErrText = se2; firstErrCode = rc2;
+                        }
                     }
-                    if ((so ?? "").Trim().Length > 10) break;
                 }
 
-                if (rc != 0 || LooksLikeError(so, se))
+                if (!got)
                 {
-                    c.Error = ShortError(so, se, rc);
+                    c.Error = ShortError(firstErrOut, firstErrText, firstErrCode);
                     r.AddLog(LogLevel.Warn, "Кластер", "session list: " + c.Error);
                     continue;
+                }
+                if (loginUsed.Length > 0 && loginUsed != user)
+                {
+                    c.Note = "Сеансы прочитаны логином «" + loginUsed + "».";
+                    r.AddLog(LogLevel.Info, "Кластер", c.Note);
+                }
+                else
+                {
+                    c.Note = "";
                 }
                 try
                 {
@@ -289,6 +319,71 @@ namespace OneCLicenseInspector
                 }
             }
             r.AddLog(LogLevel.Info, "Кластер", "Сеансов: " + c.Sessions.Count);
+        }
+
+        private static readonly Dictionary<string, string[]> AdminNamesCache =
+            new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Логины администраторов кластера — из «cluster admin list». Нужны, когда в приложении
+        /// ввели не то имя: rac сам подсказывает, какие имена вообще существуют. Пароль берём
+        /// только тот, что ввёл пользователь, — чужих паролей у нас нет.
+        /// </summary>
+        private static string[][] AdminNameCreds(ScanResult r, ClusterInfo c, string clusterId, string user, string password)
+        {
+            string key = c.Endpoint + "|" + clusterId;
+            string[] names;
+            if (!AdminNamesCache.TryGetValue(key, out names))
+            {
+                List<string> found = new List<string>();
+                string[] logins = new string[] { user, "", "Администратор", "Administrator" };
+                foreach (string login in logins)
+                {
+                    StringBuilder a = new StringBuilder("cluster admin list --cluster=").Append(clusterId);
+                    if (!string.IsNullOrEmpty(login))
+                    {
+                        a.Append(" --cluster-user=\"").Append(login).Append("\"");
+                        if (!string.IsNullOrEmpty(password)) a.Append(" --cluster-pwd=\"").Append(password).Append("\"");
+                        a.Append(' ').Append(c.Endpoint);
+                    }
+                    string so, se;
+                    int rc = Exec.Run(c.RacPath, a.ToString(), 15000, out so, out se);
+                    Diag.Log("rac cluster admin list [" + (login.Length == 0 ? "no-auth" : login) + "]: rc=" + rc +
+                             " out=" + (so ?? "").Trim());
+                    if (rc != 0 || LooksLikeError(so, se)) continue;
+                    foreach (Record rec in ParseRecords(so, "name"))
+                    {
+                        string nm = rec.Get("name");
+                        string auth = rec.Get("auth");
+                        if (nm.Length == 0) continue;
+                        // без пароля администратор не войдёт — при auth=os/publickey пропускаем
+                        if (auth.Length > 0 && auth.IndexOf("pwd", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                        if (!found.Contains(nm)) found.Add(nm);
+                    }
+                    if (found.Count > 0) break;
+                }
+                names = found.ToArray();
+                AdminNamesCache[key] = names;
+            }
+
+            List<string[]> creds = new List<string[]>();
+            foreach (string nm in names)
+            {
+                if (string.Equals(nm, user, StringComparison.Ordinal)) continue;
+                creds.Add(new string[] { nm, password ?? "" });
+            }
+            return creds.ToArray();
+        }
+
+        internal static string SessionArgs(string endpoint, string clusterId, string login, string pwd, bool newStyle)
+        {
+            StringBuilder a = new StringBuilder();
+            if (!newStyle) a.Append(endpoint).Append(' ');
+            a.Append("session list --cluster=").Append(clusterId).Append(" --licenses");
+            if (!string.IsNullOrEmpty(login)) a.Append(" --cluster-user=\"").Append(login).Append("\"");
+            if (!string.IsNullOrEmpty(pwd)) a.Append(" --cluster-pwd=\"").Append(pwd).Append("\"");
+            if (newStyle) a.Append(' ').Append(endpoint);
+            return a.ToString();
         }
 
         public static string FindRas(ScanResult r)
@@ -465,7 +560,7 @@ namespace OneCLicenseInspector
             return s;
         }
 
-        private class Record
+        internal class Record
         {
             private readonly Dictionary<string, string> _map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             private string _last = "";
@@ -491,7 +586,7 @@ namespace OneCLicenseInspector
             public bool Empty { get { return _map.Count == 0; } }
         }
 
-        private static List<Record> ParseRecords(string text, string startKey)
+        internal static List<Record> ParseRecords(string text, string startKey)
         {
             List<Record> list = new List<Record>();
             if (string.IsNullOrEmpty(text)) return list;

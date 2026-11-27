@@ -686,9 +686,43 @@ namespace OneCLicenseInspector.Ui
             close.Location = new Point(310, 8);
             close.Click += delegate { f.Close(); };
 
+            // Полная диагностика: отдельно выясняет, какие администраторы есть в кластере,
+            // каким способом они входят и видит ли rac инфобазы и сеансы.
+            FlatButton probe = new FlatButton();
+            probe.Text = "Полная диагностика rac";
+            probe.Kind = ButtonKind.Secondary;
+            probe.Size = new Size(210, 30);
+            probe.Location = new Point(450, 8);
+            probe.Click += delegate
+            {
+                if (_result == null)
+                {
+                    box.Text = "Данных ещё нет: сначала нажмите «Обновить», чтобы программа опросила кластер.";
+                    return;
+                }
+                try
+                {
+                    Cursor.Current = Cursors.WaitCursor;
+                    string path;
+                    string full = RacProbe.BuildAndSave(_result, _sessServer.Text.Trim(), _sessUser.Text.Trim(), _sessPwd.Text, out path);
+                    box.Text = "Файл диагностики: " + path + Environment.NewLine + Environment.NewLine + full;
+                    box.SelectionStart = 0;
+                    box.ScrollToCaret();
+                }
+                catch (Exception ex)
+                {
+                    box.Text = "Сбой диагностики rac: " + ex.GetType().Name + ": " + ex.Message;
+                }
+                finally
+                {
+                    Cursor.Current = Cursors.Default;
+                }
+            };
+
             bar.Controls.Add(folder);
             bar.Controls.Add(copy);
             bar.Controls.Add(close);
+            bar.Controls.Add(probe);
             f.Controls.Add(box);
             f.Controls.Add(bar);
             f.ShowDialog(this.FindForm());

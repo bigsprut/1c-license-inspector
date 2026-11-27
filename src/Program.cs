@@ -111,7 +111,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.5.27";
+        public const string Version = "1.5.28";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -213,6 +213,27 @@ namespace OneCLicenseInspector
                 string digest = Arg(args, "/digest");
                 bool silent = Has(args, "/silent") || Has(args, "/quiet");
                 Boot("args: report=" + report + " csv=" + csv + " silent=" + silent);
+
+                if (Has(args, "/racprobe") || Arg(args, "/racprobe").Length > 0)
+                {
+                    ScanResult pr = new ScanResult();
+                    pr.Started = DateTime.Now;
+                    try { CollectSystem.Run(pr); } catch { }
+                    try { CollectPlatforms.Run(pr); } catch { }
+                    try { CollectCluster.Run(pr, RasEndpoint, ClusterUser, ClusterPwd); } catch { }
+                    string probePath = Arg(args, "/racprobe");
+                    string text = RacProbe.Build(pr, RasEndpoint, ClusterUser, ClusterPwd);
+                    if (string.IsNullOrEmpty(probePath)) probePath = RacProbe.DefaultPath();
+                    WriteText(probePath, text, true);
+                    try
+                    {
+                        string dir = Path.GetDirectoryName(probePath);
+                        if (!string.IsNullOrEmpty(dir)) WriteText(Path.Combine(dir, "latest-racprobe.txt"), text, true);
+                    }
+                    catch { }
+                    if (!silent) Console.WriteLine("Диагностика rac: " + probePath);
+                    return 0;
+                }
 
                 if (!string.IsNullOrEmpty(digest))
                 {
