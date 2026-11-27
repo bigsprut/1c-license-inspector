@@ -39,6 +39,7 @@ namespace OneCLicenseInspector
 
             r.Finished = DateTime.Now;
             CrossCheck(r);
+            AutoDrop.Write(r);
             Diag.Log("scan: done");
             r.MachineInfo = r.System.ComputerName + " · " + r.System.OsCaption + " " + r.System.OsArch;
             Report1(progress, "Готово");
@@ -110,7 +111,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.5.22";
+        public const string Version = "1.5.23";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
