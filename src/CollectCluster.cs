@@ -157,9 +157,10 @@ namespace OneCLicenseInspector
             c.Available = true;
 
             string output, errorText;
-            string clArgs = endpoint + " cluster list";
+            string clArgs = endpoint;
             if (!string.IsNullOrEmpty(user)) clArgs += " --cluster-user=\"" + user + "\"";
             if (!string.IsNullOrEmpty(password)) clArgs += " --cluster-pwd=\"" + password + "\"";
+            clArgs += " cluster list";
             int code = Exec.Run(c.RacPath, clArgs, 6000, out output, out errorText);
             c.Raw = output;
             Diag.Log("rac cluster list: rc=" + code + " out=" + (output ?? "").Trim());
@@ -193,9 +194,10 @@ namespace OneCLicenseInspector
             foreach (ClusterEntry e in c.Clusters)
             {
                 StringBuilder args = new StringBuilder();
-                args.Append(endpoint).Append(" session list --cluster=").Append(e.Id).Append(" --licenses");
+                args.Append(endpoint);
                 if (!string.IsNullOrEmpty(user)) args.Append(" --cluster-user=\"").Append(user).Append('"');
                 if (!string.IsNullOrEmpty(password)) args.Append(" --cluster-pwd=\"").Append(password).Append('"');
+                args.Append(" session list --cluster=").Append(e.Id).Append(" --licenses");
 
                 string so, se;
                 int rc = Exec.Run(c.RacPath, args.ToString(), 10000, out so, out se);
