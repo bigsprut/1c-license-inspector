@@ -6,6 +6,52 @@ namespace OneCLicenseInspector
 {
     internal static class Report
     {
+        public static string BuildDigest(ScanResult r, string logTail)
+        {
+            StringBuilder b = new StringBuilder();
+            b.AppendLine("Инспектор лицензий 1С " + Program.Version);
+            b.AppendLine("Компьютер: " + r.System.ComputerName + " · " + r.System.OsCaption + " " + r.System.OsArch);
+            b.AppendLine("Проверка: " + r.Finished.ToString("dd.MM.yyyy HH:mm"));
+            b.AppendLine();
+
+            b.AppendLine("Платформы (" + r.Platforms.Count + "):");
+            foreach (PlatformInfo p in r.Platforms)
+                b.AppendLine("  " + p.Version + " " + p.Bitness + " " + p.BinPath);
+            b.AppendLine();
+
+            b.AppendLine("Лицензии (" + r.LicenseFiles.Count + "):");
+            foreach (LicenseFileInfo lf in r.LicenseFiles)
+            {
+                b.AppendLine("  " + lf.FileName + " | рег. " + lf.Pin + " | " + lf.Product + " | тип " + lf.LicenseType +
+                             " | мест " + lf.UsersNum + " | " + lf.Expires + " | " + lf.BoundTo);
+            }
+            b.AppendLine();
+
+            if (r.Cluster != null)
+            {
+                ClusterInfo c = r.Cluster;
+                b.AppendLine("Кластер: доступен=" + c.Available + " endpoint=" + c.Endpoint +
+                             " процессов=" + c.Processes.Count + " сеансов=" + c.Sessions.Count);
+                if (!string.IsNullOrEmpty(c.Error)) b.AppendLine("  ошибка: " + c.Error);
+                if (!string.IsNullOrEmpty(c.Note)) b.AppendLine("  примечание: " + c.Note);
+                if (!string.IsNullOrEmpty(c.RacPath)) b.AppendLine("  rac: " + c.RacPath);
+                foreach (SessionEntry s in c.Processes)
+                    b.AppendLine("  процесс: " + s.User + " " + s.Host + " pid=" + s.SessionId + " " + s.LicenseShort);
+                foreach (SessionEntry s in c.Sessions)
+                {
+                    b.AppendLine("  сеанс: user=" + s.User + " host=" + s.Host + " infobase=" + s.Infobase +
+                                 " session=" + s.SessionId + " app=" + s.AppId + " started=" + s.StartedAt +
+                                 " lic-type=" + s.LicenseType + " series=" + s.LicenseSeries +
+                                 " issued=" + s.IssuedByServer + " max=" + s.MaxUsersCur + "/" + s.MaxUsersAll +
+                                 " short=" + s.LicenseShort + " full=" + s.LicenseFull);
+                }
+                if (!string.IsNullOrEmpty(c.Raw)) b.AppendLine("=== RAW cluster list ===" + "\r\n" + c.Raw);
+                if (!string.IsNullOrEmpty(c.SessionRaw)) b.AppendLine("=== RAW session list ===" + "\r\n" + c.SessionRaw);
+            }
+            b.AppendLine();
+            if (!string.IsNullOrEmpty(logTail)) b.AppendLine("=== ЛОГ ===" + "\r\n" + logTail);
+            return b.ToString();
+        }
         public static string BuildHtml(ScanResult r)
         {
             StringBuilder b = new StringBuilder(64 * 1024);

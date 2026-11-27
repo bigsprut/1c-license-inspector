@@ -14,6 +14,7 @@ namespace OneCLicenseInspector.Ui
     {
         public FlatButton RefreshButton;
         public FlatButton Export;
+        private ToolTip _copyTip;
         public FlatButton Copy;
         public string Machine = "";
         public string Subtitle = "";
@@ -135,6 +136,7 @@ namespace OneCLicenseInspector.Ui
     public class MainForm : Form
     {
         private ScanResult _result = new ScanResult();
+        private ToolTip _copyTip;
         private HeaderPanel _header;
         private BufferedPanel _nav;
         private Panel _content;
@@ -539,32 +541,15 @@ namespace OneCLicenseInspector.Ui
         {
             try
             {
-                using (SaveFileDialog dlg = new SaveFileDialog())
-                {
-                    dlg.Title = "Сохранить отчёт о лицензиях";
-                    dlg.Filter = "HTML-отчёт (*.html)|*.html|CSV (*.csv)|*.csv";
-                    dlg.FileName = "licenses-" + SafeName(_result.System.ComputerName) + "-" + DateTime.Now.ToString("yyyyMMdd-HHmm") + ".html";
-                    if (dlg.ShowDialog(this) != DialogResult.OK) return;
-
-                    if (dlg.FilterIndex == 2)
-                    {
-                        Program.WriteText(dlg.FileName, Report.BuildCsv(_result), true);
-                    }
-                    else
-                    {
-                        Program.WriteText(dlg.FileName, Report.BuildHtml(_result), true);
-                    }
-
-                    if (MessageBox.Show(this, "Отчёт сохранён:\r\n" + dlg.FileName + "\r\n\r\nОткрыть его сейчас?", "Готово",
-                        MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
-                    {
-                        Process.Start(dlg.FileName);
-                    }
-                }
+                if (_result == null) return;
+                string text = Report.BuildDigest(_result, Diag.Tail(60000));
+                Clipboard.SetText(text);
+                if (_copyTip == null) _copyTip = new ToolTip();
+                _copyTip.Show("Отчёт скопирован — вставь в чат", _header.Export, 0, -44, 2500);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Не удалось сохранить отчёт: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, "Не удалось скопировать отчёт: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 

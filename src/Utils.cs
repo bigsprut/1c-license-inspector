@@ -512,6 +512,16 @@ namespace OneCLicenseInspector
             }
         }
 
+        public static string Tail(int maxChars)
+        {
+            try
+            {
+                string s = System.IO.File.ReadAllText(LogPath);
+                return s.Length <= maxChars ? s : s.Substring(s.Length - maxChars);
+            }
+            catch { return ""; }
+        }
+
         public static void Reset()
         {
             try

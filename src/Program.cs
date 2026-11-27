@@ -110,7 +110,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.5.21";
+        public const string Version = "1.5.22";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -209,8 +209,16 @@ namespace OneCLicenseInspector
                 }
                 string report = Arg(args, "/report");
                 string csv = Arg(args, "/csv");
+                string digest = Arg(args, "/digest");
                 bool silent = Has(args, "/silent") || Has(args, "/quiet");
                 Boot("args: report=" + report + " csv=" + csv + " silent=" + silent);
+
+                if (!string.IsNullOrEmpty(digest))
+                {
+                    ScanResult dr = Scanner.Run(null);
+                    WriteText(digest, Report.BuildDigest(dr, Diag.Tail(60000)), true);
+                    return 0;
+                }
 
                 if (!string.IsNullOrEmpty(report) || !string.IsNullOrEmpty(csv))
                 {
