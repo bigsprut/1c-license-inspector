@@ -233,6 +233,13 @@ namespace OneCLicenseInspector
                     r.AddLog(LogLevel.Warn, "Кластер", "session list: " + c.Error);
                     continue;
                 }
+                try
+                {
+                    File.WriteAllText(Path.Combine(Path.GetTempPath(), "rac-sessions.txt"), so ?? "", new UTF8Encoding(false));
+                    if (!string.IsNullOrEmpty(se)) File.WriteAllText(Path.Combine(Path.GetTempPath(), "rac-sessions-err.txt"), se, new UTF8Encoding(false));
+                }
+                catch { }
+
                 List<Record> sessions = ParseRecords(so, "session");
                 Diag.Log("rac sessions parsed=" + sessions.Count);
                 foreach (Record rec in sessions)
