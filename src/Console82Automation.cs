@@ -220,6 +220,7 @@ namespace OneCLicenseInspector
             }
 
             IntPtr node = FindNode(tree, nodeText, IntPtr.Zero, 0, 6);
+            Diag.Log("ui82: window=" + wnd + " tree=" + tree + " node=" + node);
             if (node == IntPtr.Zero)
             {
                 error = "не найден узел «" + nodeText + "»";

@@ -50,6 +50,7 @@ namespace OneCLicenseInspector
                 string procTsv = Mmc20Reader.ReadTable(msc, "Рабочие процессы", out errProc);
                 string sessTsv = Mmc20Reader.ReadTable(msc, "Сеансы", out errSess);
 
+                System.Diagnostics.Process startedMmc = null;
                 if (CountLines(sessTsv) <= 1)
                 {
                     try
@@ -57,10 +58,16 @@ namespace OneCLicenseInspector
                         if (Console82Automation.FindConsole() == IntPtr.Zero)
                         {
                             System.Diagnostics.Process.Start("mmc.exe", "\"" + msc + "\"");
-                            System.Threading.Thread.Sleep(7000);
+                            for (int w = 0; w < 30 && Console82Automation.FindConsole() == IntPtr.Zero; w++)
+                                System.Threading.Thread.Sleep(500);
                         }
+                        r.AddLog(LogLevel.Info, "Консоль 8.2",
+                            Console82Automation.FindConsole() != IntPtr.Zero ? "окно консоли найдено" : "окно консоли не появилось");
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        r.AddLog(LogLevel.Warn, "Консоль 8.2", "запуск консоли: " + ex.Message);
+                    }
                     string ui = null, uiErr = "";
                     string clipErr;
                     string clip = Console82Automation.CopyTable(out clipErr);
