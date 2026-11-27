@@ -337,6 +337,13 @@ namespace OneCLicenseInspector
                 }
                 if (!string.IsNullOrEmpty(r.Cluster.Error)) b.AppendLine("<p class=\"note\">" + H(r.Cluster.Error) + "</p>");
             }
+            if (r.Cluster != null && (!string.IsNullOrEmpty(r.Cluster.Raw) || !string.IsNullOrEmpty(r.Cluster.SessionRaw)))
+            {
+                b.AppendLine("<details><summary>Диагностика кластера (сырой ответ rac)</summary><pre class=\"raw\">");
+                if (!string.IsNullOrEmpty(r.Cluster.Raw)) b.AppendLine(H(r.Cluster.Raw));
+                if (!string.IsNullOrEmpty(r.Cluster.SessionRaw)) b.AppendLine(H(r.Cluster.SessionRaw));
+                b.AppendLine("</pre></details>");
+            }
             b.AppendLine("<h2>Сетевые порты</h2>");
             b.AppendLine("<table><tr><th>Порт</th><th>Протокол</th><th>Процесс</th><th>PID</th><th>Назначение</th></tr>");
             foreach (PortInfo p in r.Ports)

@@ -125,6 +125,15 @@ namespace OneCLicenseInspector.Ui
             _sessRefresh.Size = new Size(132, 30);
             _sessRefresh.Margin = new Padding(2, 2, 4, 2);
             _sessRefresh.Click += delegate { RefreshCluster(); };
+
+            FlatButton diagBtn = new FlatButton();
+            diagBtn.Text = "Диагностика";
+            diagBtn.Icon = "file";
+            diagBtn.Kind = ButtonKind.Ghost;
+            diagBtn.Size = new Size(130, 30);
+            diagBtn.Margin = new Padding(2, 2, 4, 2);
+            diagBtn.Click += delegate { ShowDiagnostics(); };
+            top.Controls.Add(diagBtn);
             string savedEp, savedUser, savedPwd;
             if (ClusterCredentials.Load(out savedEp, out savedUser, out savedPwd))
             {
@@ -617,6 +626,73 @@ namespace OneCLicenseInspector.Ui
             _sessDetails.Text = string.Join("\r\n", lines.ToArray());
         }
 
+        public static string DiagFolder()
+        {
+            string dir = System.IO.Path.Combine(Paths.ProgramData, "1C-License-Inspector", "diag");
+            try { if (!System.IO.Directory.Exists(dir)) System.IO.Directory.CreateDirectory(dir); return dir; }
+            catch { return System.IO.Path.GetTempPath(); }
+        }
+
+        private void ShowDiagnostics()
+        {
+            string text = "";
+            if (_result != null && _result.Cluster != null)
+            {
+                if (!string.IsNullOrEmpty(_result.Cluster.Raw)) text += "=== rac cluster list ===\r\n" + _result.Cluster.Raw + "\r\n";
+                if (!string.IsNullOrEmpty(_result.Cluster.SessionRaw)) text += "=== rac session list ===\r\n" + _result.Cluster.SessionRaw + "\r\n";
+                if (!string.IsNullOrEmpty(_result.Cluster.Error)) text += "=== ошибка ===\r\n" + _result.Cluster.Error + "\r\n";
+            }
+            if (text.Length == 0) text = "Данных rac нет. Нажмите «Обновить», чтобы программа опросила кластер.";
+
+            Form f = new Form();
+            f.Text = "Диагностика кластера 1С";
+            f.StartPosition = FormStartPosition.CenterParent;
+            f.Size = new Size(980, 640);
+            f.MinimizeBox = false;
+            f.MaximizeBox = true;
+
+            TextBox box = new TextBox();
+            box.Multiline = true;
+            box.ReadOnly = true;
+            box.ScrollBars = ScrollBars.Both;
+            box.WordWrap = false;
+            box.Dock = DockStyle.Fill;
+            box.Font = Theme.MonoFont(9f);
+            box.Text = text;
+            EnableCopy(box);
+
+            Panel bar = new Panel();
+            bar.Dock = DockStyle.Bottom;
+            bar.Height = 46;
+
+            FlatButton folder = new FlatButton();
+            folder.Text = "Открыть папку";
+            folder.Kind = ButtonKind.Secondary;
+            folder.Size = new Size(150, 30);
+            folder.Location = new Point(10, 8);
+            folder.Click += delegate { try { System.Diagnostics.Process.Start("explorer.exe", DiagFolder()); } catch { } };
+
+            FlatButton copy = new FlatButton();
+            copy.Text = "Копировать";
+            copy.Kind = ButtonKind.Ghost;
+            copy.Size = new Size(130, 30);
+            copy.Location = new Point(170, 8);
+            copy.Click += delegate { try { Clipboard.SetText(box.Text); } catch { } };
+
+            FlatButton close = new FlatButton();
+            close.Text = "Закрыть";
+            close.Kind = ButtonKind.Ghost;
+            close.Size = new Size(110, 30);
+            close.Location = new Point(310, 8);
+            close.Click += delegate { f.Close(); };
+
+            bar.Controls.Add(folder);
+            bar.Controls.Add(copy);
+            bar.Controls.Add(close);
+            f.Controls.Add(box);
+            f.Controls.Add(bar);
+            f.ShowDialog(this.FindForm());
+        }
         private void RefreshCluster()
         {
             if (_result == null) return;

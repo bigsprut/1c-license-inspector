@@ -235,7 +235,11 @@ namespace OneCLicenseInspector
                 }
                 try
                 {
-                    File.WriteAllText(Path.Combine(Path.GetTempPath(), "rac-sessions.txt"), so ?? "", new UTF8Encoding(false));
+                    string diagDir = Path.Combine(Paths.ProgramData, "1C-License-Inspector", "diag");
+                    try { if (!Directory.Exists(diagDir)) Directory.CreateDirectory(diagDir); } catch { diagDir = Path.GetTempPath(); }
+                    File.WriteAllText(Path.Combine(diagDir, "rac-sessions.txt"), so ?? "", new UTF8Encoding(false));
+                    try { File.WriteAllText(Path.Combine(diagDir, "rac-cluster.txt"), c.Raw ?? "", new UTF8Encoding(false)); } catch { }
+                    if (c.SessionRaw.Length < 200000) c.SessionRaw += (so ?? "") + "\n";
                     if (!string.IsNullOrEmpty(se)) File.WriteAllText(Path.Combine(Path.GetTempPath(), "rac-sessions-err.txt"), se, new UTF8Encoding(false));
                 }
                 catch { }
