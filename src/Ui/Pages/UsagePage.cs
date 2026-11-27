@@ -139,6 +139,7 @@ namespace OneCLicenseInspector.Ui
             _sessDetails.Font = Theme.MonoFont(8.5f);
             _sessDetails.Dock = DockStyle.Bottom;
             _sessDetails.Height = 96;
+            EnableCopy(_sessDetails);
 
             _sessions = MakeGrid();
             _sessions.Columns.Add(Col("Пользователь", "User", 100));

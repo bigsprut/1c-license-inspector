@@ -44,6 +44,7 @@ namespace OneCLicenseInspector.Ui
             _hex.ForeColor = Theme.InkSoft;
             _hex.Font = Theme.MonoFont(8.5f);
             _hex.Dock = DockStyle.Fill;
+            EnableCopy(_hex);
             _hexCard = WithTitle("Содержимое файла лицензии — можно выделить и скопировать (Ctrl+C)", Card(_hex, new Padding(10)));
             AddRow(_hexCard, 140);
             AddSpacer(6);
@@ -57,6 +58,7 @@ namespace OneCLicenseInspector.Ui
             _ring.ForeColor = Theme.InkSoft;
             _ring.Font = Theme.MonoFont(8.5f);
             _ring.Dock = DockStyle.Fill;
+            EnableCopy(_ring);
             AddRow(WithTitle("Вывод утилиты лицензирования ring", Card(_ring, new Padding(10))), 126);
         }
 

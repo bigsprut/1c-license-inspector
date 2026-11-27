@@ -163,6 +163,24 @@ namespace OneCLicenseInspector.Ui
             return h;
         }
 
+        protected void EnableCopy(TextBox tb)
+        {
+            if (tb == null) return;
+            tb.ShortcutsEnabled = true;
+            tb.TabStop = true;
+            ContextMenuStrip m = new ContextMenuStrip();
+            m.Items.Add("Копировать выделенное", null, delegate
+            {
+                try
+                {
+                    string text = tb.SelectionLength > 0 ? tb.SelectedText : tb.Text;
+                    if (!string.IsNullOrEmpty(text)) Clipboard.SetText(text);
+                }
+                catch { }
+            });
+            m.Items.Add("Выделить всё", null, delegate { tb.SelectAll(); tb.Focus(); });
+            tb.ContextMenuStrip = m;
+        }
         protected Panel Card(Control inner, Padding pad)
         {
             BufferedPanel card = new BufferedPanel();

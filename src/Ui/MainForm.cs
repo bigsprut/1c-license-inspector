@@ -14,6 +14,7 @@ namespace OneCLicenseInspector.Ui
     {
         public FlatButton RefreshButton;
         public FlatButton Export;
+        public FlatButton Copy;
         public string Machine = "";
         public string Subtitle = "";
         private bool _busy;
@@ -32,8 +33,14 @@ namespace OneCLicenseInspector.Ui
             Export.Icon = "export";
             Export.Kind = ButtonKind.Ghost;
             Export.Size = new Size(118, 36);
+            Copy = new FlatButton();
+            Copy.Text = "Копировать";
+            Copy.Icon = "copy";
+            Copy.Kind = ButtonKind.Ghost;
+            Copy.Size = new Size(132, 36);
             Controls.Add(RefreshButton);
             Controls.Add(Export);
+            Controls.Add(Copy);
         }
 
         public void SetBusy(bool busy)
@@ -51,7 +58,8 @@ namespace OneCLicenseInspector.Ui
             if (RefreshButton == null || Export == null) return;
             int right = Width - 20;
             Export.Location = new Point(right - Export.Width, (Height - Export.Height) / 2 + 2);
-            RefreshButton.Location = new Point(Export.Left - RefreshButton.Width - 8, (Height - RefreshButton.Height) / 2 + 2);
+            Copy.Location = new Point(Export.Left - Copy.Width - 8, (Height - Copy.Height) / 2 + 2);
+            RefreshButton.Location = new Point(Copy.Left - RefreshButton.Width - 8, (Height - RefreshButton.Height) / 2 + 2);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -206,6 +214,7 @@ namespace OneCLicenseInspector.Ui
                 _header.Subtitle = "Аудит лицензий на этом компьютере";
                 _header.RefreshButton.Click += delegate { StartScan(); };
                 _header.Export.Click += delegate { ExportReport(); };
+            _header.Copy.Click += delegate { CopyCurrentPage(); };
                 Controls.Add(_header);
             }
 
@@ -353,6 +362,7 @@ namespace OneCLicenseInspector.Ui
                 Diag.Log("page " + index + " ok");
                 if (_result != null)
                 {
+                    page.SetSnapshot(_result);
                     page.Bind(_result);
                     page.ScrollTop();
                 }
