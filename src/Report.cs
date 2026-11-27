@@ -226,6 +226,17 @@ namespace OneCLicenseInspector
                 b.AppendLine("<p class=\"note\">Идентификатор компьютера для привязки лицензий: <code>" + H(r.HostId) + "</code></p>");
             }
 
+            if (r.LicenseFiles.Count > 0)
+            {
+                bool anyPin = false;
+                foreach (LicenseFileInfo lf in r.LicenseFiles) { if (!string.IsNullOrEmpty(lf.Pin)) { anyPin = true; break; } }
+                if (!anyPin)
+                {
+                    b.AppendLine("<p class=\"note\">Файлы лицензий 8.2 зашифрованы: PIN, редакцию и места снаружи не прочитать — " +
+                                 "их показывает консоль администрирования 8.2 (или сама 1С). Импортируйте таблицу сеансов/процессов " +
+                                 "кнопкой «Из консоли 8.2», и данные попадут в этот отчёт.</p>");
+                }
+            }
             if (!string.IsNullOrEmpty(r.LicenseRing))
             {
                 b.AppendLine("<p class=\"note\">Утилита лицензирования: <code>" + H(r.LicenseRing) + "</code></p>");
@@ -268,6 +279,32 @@ namespace OneCLicenseInspector
             }
             else
             {
+                bool imported = r.Cluster.Endpoint != null &&
+                                r.Cluster.Endpoint.IndexOf("консоль 8.2", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (imported)
+                {
+                    b.AppendLine("<p class=\"note\">Источник: импорт таблицы из консоли администрирования 1С 8.2.</p>");
+                    b.AppendLine("<table><tr><th>Пользователь</th><th>Компьютер</th><th>Приложение</th><th>База</th><th>Начало</th><th>Лицензия</th><th>PIN</th><th>Занято</th><th>Всего</th></tr>");
+                    foreach (SessionEntry s in r.Cluster.Sessions)
+                    {
+                        string kind, pin; int used, total;
+                        Console82Import.ParseLicense(s.LicenseShort, out kind, out pin, out used, out total);
+                        b.AppendLine("<tr><td><b>" + H(s.User) + "</b></td><td>" + H(s.Host) +
+                                    "</td><td>" + H(s.AppId) + "</td><td class=\"muted\">" + H(ShortId(s.Infobase)) + "</td><td>" + H(s.StartedAt) +
+                                    "</td><td>" + H(kind) + "</td><td>" + H(pin) + "</td><td>" + H(used >= 0 ? used.ToString() : "") +
+                                    "</td><td>" + H(total >= 0 ? total.ToString() : "") + "</td></tr>");
+                    }
+                    b.AppendLine("</table>");
+                    if (r.Cluster.Sessions.Count > 0)
+                    {
+                        string k0, p0; int u0, t0;
+                        Console82Import.ParseLicense(r.Cluster.Sessions[0].LicenseShort, out k0, out p0, out u0, out t0);
+                        if (u0 >= 0 && t0 >= 0)
+                            b.AppendLine("<p class=\"note\">Лицензия " + H(k0) + ", PIN " + H(p0) + ": занято " + u0 + " из " + t0 + ".</p>");
+                    }
+                }
+                else
+                {
                 b.AppendLine("<table><tr><th>Пользователь</th><th>Компьютер</th><th>Приложение</th><th>База</th><th>Начало</th><th>Лицензия</th><th>Мест</th></tr>");
                 foreach (SessionEntry s in r.Cluster.Sessions)
                 {
@@ -283,6 +320,7 @@ namespace OneCLicenseInspector
                                 "</td><td>" + H(lic) + "</td><td>" + H(seats) + "</td></tr>");
                 }
                 b.AppendLine("</table>");
+                }
                 if (!string.IsNullOrEmpty(r.Cluster.Error)) b.AppendLine("<p class=\"note\">" + H(r.Cluster.Error) + "</p>");
             }
             b.AppendLine("<h2>Сетевые порты</h2>");
