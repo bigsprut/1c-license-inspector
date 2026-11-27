@@ -121,7 +121,9 @@ powershell -ExecutionPolicy Bypass -File .\Collect-LicenseData.ps1
 Результат: `build\1C-License-Inspector.exe`. Иконка генерируется скриптом
 `tools\make-icon.ps1`, манифест — `res\app.manifest`.
 
-Каждый тег `v*` автоматически собирается в GitHub Actions и прикрепляется к релизу.\n\nПри сборке используется компилятор C# 4.0 и **API .NET 4.0** — чтобы exe запускался
+Каждый тег `v*` автоматически собирается в GitHub Actions и прикрепляется к релизу.
+
+При сборке используется компилятор C# 4.0 и **API .NET 4.0** — чтобы exe запускался
 на Server 2003 с .NET 4.0. Не поднимайте целевую версию платформы.
 
 ## Проверено
