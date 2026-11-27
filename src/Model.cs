@@ -73,6 +73,13 @@ namespace OneCLicenseInspector
         public string Note = "";
         public string Format = "";
         public string Preview = "";
+        public string Pin = "";
+        public string Product = "";
+        public string LicenseType = "";
+        public string Users = "";
+        public int UsersNum;
+        public string Expires = "";
+        public string BoundTo = "";
     }
 
     public class SentinelFeature

@@ -177,7 +177,8 @@ namespace OneCLicenseInspector
                 b.AppendLine("<p class=\"muted\">Каталоги поиска: " + H(string.Join("; ", r.LicenseStorages.ToArray())) + "</p>");
             int seatSumR = 0; bool seatUnlimR = false;
             foreach (SentinelFeature f in r.Sentinel.Features) { if (f.IsUnlimited) seatUnlimR = true; else seatSumR += f.LimitNum > 0 ? f.LimitNum : 0; }
-            Row(b, "Лицензий всего", "Лицензий: " + r.LicenseFiles.Count + " (1 файл *.lic = 1 лицензия) · мест в аппаратных ключах: " + (seatUnlimR ? "∞" : (seatSumR > 0 ? seatSumR.ToString() : "нет данных")));
+            int usersSumR = 0; foreach (LicenseFileInfo lf in r.LicenseFiles) usersSumR += lf.UsersNum;
+            Row(b, "Лицензий всего", "Лицензий: " + r.LicenseFiles.Count + " (1 файл *.lic = 1 лицензия) · пользователей: " + usersSumR + " · мест в аппаратных ключах: " + (seatUnlimR ? "∞" : (seatSumR > 0 ? seatSumR.ToString() : "нет данных")));
             }
             if (r.LicenseFiles.Count == 0)
             {
@@ -185,11 +186,12 @@ namespace OneCLicenseInspector
             }
             else
             {
-                b.AppendLine("<table><tr><th>Файл</th><th>Активирована</th><th>Размер</th><th>Формат</th><th>SHA-1</th><th>Каталог</th></tr>");
+                b.AppendLine("<table><tr><th>Файл</th><th>Рег. номер (PIN)</th><th>Продукт</th><th>Тип</th><th>Пользователей</th><th>Срок действия</th><th>Привязка</th><th>Каталог</th></tr>");
                 foreach (LicenseFileInfo f in r.LicenseFiles)
                 {
-                    b.AppendLine("<tr><td><b>" + H(f.FileName) + "</b></td><td>" + H(f.Activated) + "</td><td>" + H(Fmt.Bytes(f.Size)) +
-                                "</td><td>" + H(f.Format) + "</td><td class=\"muted\">" + H(f.Sha1) + "</td><td class=\"muted\">" + H(f.Directory) + "</td></tr>");
+                    b.AppendLine("<tr><td><b>" + H(f.FileName) + "</b></td><td>" + H(f.Pin) + "</td><td>" + H(f.Product) +
+                                "</td><td>" + H(f.LicenseType) + "</td><td>" + H(f.Users) + "</td><td>" + H(f.Expires) +
+                                "</td><td class=\"muted\">" + H(f.BoundTo) + "</td><td class=\"muted\">" + H(f.Directory) + "</td></tr>");
                 }
                 b.AppendLine("</table>");
             }

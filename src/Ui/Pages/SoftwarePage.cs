@@ -24,11 +24,12 @@ namespace OneCLicenseInspector.Ui
             AddSpacer(6);
 
             _grid = MakeGrid();
-            _grid.Columns.Add(Col("Файл", "FileName", 120));
-            _grid.Columns.Add(Col("Активирована", "Activated", 100));
-            _grid.Columns.Add(Col("Размер", "SizeText", 70));
-            _grid.Columns.Add(Col("Формат", "Format", 100));
-            _grid.Columns.Add(Col("Изменён", "ModifiedText", 100));
+            _grid.Columns.Add(Col("Файл", "FileName", 150));
+            _grid.Columns.Add(Col("Рег. номер", "Pin", 120));
+            _grid.Columns.Add(Col("Продукт", "Product", 250));
+            _grid.Columns.Add(Col("Тип", "LicenseType", 90));
+            _grid.Columns.Add(Col("Польз.", "Users", 60));
+            _grid.Columns.Add(Col("Срок", "Expires", 110));
             _grid.Columns.Add(Col("Каталог", "Directory", 220));
             _grid.SelectionChanged += delegate { ShowDetails(); };
             AddRow(WithTitle("Файлы лицензий", Card(_grid, new Padding(1))), 176);
@@ -101,8 +102,10 @@ namespace OneCLicenseInspector.Ui
                 else seatSum += f.LimitNum > 0 ? f.LimitNum : 0;
             }
             string seats = seatUnlimited ? "∞" : (seatSum > 0 ? seatSum.ToString() : "нет данных");
+            int usersSum = 0;
+            foreach (LicenseFileInfo lf in r.LicenseFiles) usersSum += lf.UsersNum;
             info.Add(new KeyValuePair<string, string>("Лицензий всего",
-                "Лицензий: " + r.LicenseFiles.Count + " (1 файл *.lic = 1 лицензия) · мест в аппаратных ключах: " + seats));
+                "Лицензий: " + r.LicenseFiles.Count + " (1 файл *.lic = 1 лицензия) · пользователей: " + usersSum + " · мест в аппаратных ключах: " + seats));
             info.Add(new KeyValuePair<string, string>("Каталоги поиска",
                 r.LicenseStorages.Count == 0 ? "стандартные каталоги отсутствуют" : string.Join("; ", r.LicenseStorages.ToArray())));
             info.Add(new KeyValuePair<string, string>("Отпечаток ПК",
@@ -111,7 +114,7 @@ namespace OneCLicenseInspector.Ui
                 string.IsNullOrEmpty(r.JavaPath) ? "не найдена — без Java утилита ring не запустится" : r.JavaPath));
             info.Add(new KeyValuePair<string, string>("Утилита ring",
                 string.IsNullOrEmpty(r.LicenseRing)
-                    ? "не найдена — PIN, редакцию и число мест читает только утилита лицензирования 1С"
+                    ? "не найдена (не обязательна: PIN, редакция и места читаются из *.lic)"
                     : r.LicenseRing));
 
 
@@ -132,7 +135,7 @@ namespace OneCLicenseInspector.Ui
                 _ring.Text = "Утилита лицензирования 1С (ring) не найдена." + Environment.NewLine +
                     (string.IsNullOrEmpty(r.JavaPath) ? "Java не найдена." : "Java есть: " + r.JavaPath) + Environment.NewLine +
                     "Если она установлена, программа покажет список лицензий с PIN, редакцией и числом мест автоматически." + Environment.NewLine +
-                    "Содержимое *.lic зашифровано — PIN и редакцию показывает только ring." + Environment.NewLine +
+                    "PIN, редакция и число мест читаются прямо из файлов *.lic (нижняя часть файла — открытый текст)." + Environment.NewLine +
                     "Утилита входит в комплект «1C:Enterprise License Tools» и требует Java.";
             }
 
@@ -141,6 +144,11 @@ namespace OneCLicenseInspector.Ui
             {
                 FileRow row = new FileRow();
                 row.FileName = f.FileName;
+                row.Pin = string.IsNullOrEmpty(f.Pin) ? "—" : f.Pin;
+                row.Product = string.IsNullOrEmpty(f.Product) ? "—" : f.Product;
+                row.LicenseType = string.IsNullOrEmpty(f.LicenseType) ? "—" : f.LicenseType;
+                row.Users = string.IsNullOrEmpty(f.Users) ? "—" : f.Users;
+                row.Expires = string.IsNullOrEmpty(f.Expires) ? "—" : f.Expires;
                 row.Activated = string.IsNullOrEmpty(f.Activated) ? "—" : f.Activated;
                 row.SizeText = Fmt.Bytes(f.Size);
                 row.Format = f.Format;
@@ -190,6 +198,11 @@ namespace OneCLicenseInspector.Ui
         public class FileRow
         {
             public string FileName { get; set; }
+            public string Pin { get; set; }
+            public string Product { get; set; }
+            public string LicenseType { get; set; }
+            public string Users { get; set; }
+            public string Expires { get; set; }
             public string Activated { get; set; }
             public string SizeText { get; set; }
             public string Format { get; set; }

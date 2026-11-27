@@ -36,7 +36,8 @@ namespace OneCLicenseInspector
                     bool dup = false;
                     foreach (LicenseFileInfo x in r.LicenseFiles)
                     {
-                        if (string.Equals(x.FullPath, info.FullPath, StringComparison.OrdinalIgnoreCase)) { dup = true; break; }
+                        if (string.Equals(x.FullPath, info.FullPath, StringComparison.OrdinalIgnoreCase) ||
+                            (string.Equals(x.FileName, info.FileName, StringComparison.OrdinalIgnoreCase) && x.Size == info.Size && x.Sha1 == info.Sha1)) { dup = true; break; }
                     }
                     if (!dup) r.LicenseFiles.Add(info);
                 }
@@ -185,6 +186,25 @@ namespace OneCLicenseInspector
             }
         }
 
+        private static bool IsJunctionAlias(string path)
+        {
+            try
+            {
+                string p = path.Replace('/', '\\');
+                return p.IndexOf(@"\Users\All Users\", StringComparison.OrdinalIgnoreCase) >= 0
+                    || p.IndexOf(@"\Users\Все пользователи\", StringComparison.OrdinalIgnoreCase) >= 0
+                    || p.IndexOf(@"\Documents and Settings\All Users\", StringComparison.OrdinalIgnoreCase) >= 0
+                    || p.IndexOf(@"\Documents and Settings\Все пользователи\", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+            catch { return false; }
+        }
+
+        private static bool IsLic(string path)
+        {
+            try { return string.Equals(Path.GetExtension(path), ".lic", StringComparison.OrdinalIgnoreCase); }
+            catch { return false; }
+        }
+
         private static void AddUniquePath(List<string> list, string path)
         {
             if (string.IsNullOrEmpty(path)) return;
@@ -194,6 +214,48 @@ namespace OneCLicenseInspector
                 if (string.Equals(x.TrimEnd('\\'), norm, StringComparison.OrdinalIgnoreCase)) return;
             }
             list.Add(norm);
+        }
+
+        /// <summary>В *.lic после base64-блока идут открытые поля: рег. номер, продукт, места, привязка.</summary>
+        private static void ParseLicenseText(LicenseFileInfo info)
+        {
+            try
+            {
+                byte[] bytes = File.ReadAllBytes(info.FullPath);
+                string text = DecodeText(bytes);
+                if (string.IsNullOrEmpty(text)) return;
+                info.Pin = Field(text, "Регистрационный номер");
+                info.LicenseType = Field(text, "Тип лицензии");
+                info.Product = Field(text, "Наименование продукта");
+                info.Expires = Field(text, "Срок действия");
+                info.Users = Field(text, "Количество пользователей");
+                info.BoundTo = Field(text, "Привязка");
+                int n;
+                if (int.TryParse(info.Users, out n)) info.UsersNum = n;
+            }
+            catch { }
+        }
+
+        private static string DecodeText(byte[] bytes)
+        {
+            try { return new UTF8Encoding(false, true).GetString(bytes); } catch { }
+            try { return Encoding.GetEncoding(1251).GetString(bytes); } catch { }
+            return Encoding.Default.GetString(bytes);
+        }
+
+        private static string Field(string text, string label)
+        {
+            int i = text.IndexOf(label, StringComparison.OrdinalIgnoreCase);
+            if (i < 0) return "";
+            int colon = text.IndexOf(':', i);
+            if (colon < 0) return "";
+            int end = text.IndexOf('\n', colon);
+            string v = end < 0 ? text.Substring(colon + 1) : text.Substring(colon + 1, end - colon - 1);
+            return v.Trim().Trim('\r', ' ');
+        }
+        public static LicenseFileInfo ParseFile(string path)
+        {
+            return ReadLicenseFile(path);
         }
 
         private static LicenseFileInfo ReadLicenseFile(string path)
@@ -211,6 +273,7 @@ namespace OneCLicenseInspector
                 info.Activated = DecodeNameDate(fi.Name);
                 info.Format = DetectFormat(path);
                 info.Preview = Files.HexPreview(path, 64);
+                ParseLicenseText(info);
                 info.Note = NoteForFormat(info.Format);
                 return info;
             }

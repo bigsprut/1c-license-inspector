@@ -109,7 +109,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.1.9";
+        public const string Version = "1.2.0";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -167,6 +167,21 @@ namespace OneCLicenseInspector
                 DebugLog = Has(args, "/debug");
                 Boot("text rendering ok");
 
+                string licFile = Arg(args, "/lic");
+                if (!string.IsNullOrEmpty(licFile))
+                {
+                    LicenseFileInfo li = CollectLicenses.ParseFile(licFile);
+                    string dump = "pin=" + li.Pin + Environment.NewLine +
+                                  "product=" + li.Product + Environment.NewLine +
+                                  "type=" + li.LicenseType + Environment.NewLine +
+                                  "users=" + li.Users + Environment.NewLine +
+                                  "expires=" + li.Expires + Environment.NewLine +
+                                  "bound=" + li.BoundTo;
+                    string outFile = Arg(args, "/licout");
+                    if (!string.IsNullOrEmpty(outFile)) File.WriteAllText(outFile, dump, Encoding.UTF8);
+                    else Console.WriteLine(dump);
+                    return 0;
+                }
                 string report = Arg(args, "/report");
                 string csv = Arg(args, "/csv");
                 bool silent = Has(args, "/silent") || Has(args, "/quiet");
@@ -356,6 +371,11 @@ namespace OneCLicenseInspector
             }
             foreach (SentinelFeature f in r.Sentinel.Features) f.KeyId = MaskId(f.KeyId);
             if (!string.IsNullOrEmpty(r.JavaPath)) r.JavaPath = @"C:\Program Files\Java\jre\bin\java.exe";
+            foreach (LicenseFileInfo lf in r.LicenseFiles)
+            {
+                lf.Pin = MaskId(lf.Pin);
+                lf.BoundTo = "DEMO-PC";
+            }
             if (r.Hasp4.UsbKeys.Count > 0)
             {
                 r.Hasp4.UsbKeys.Clear();
