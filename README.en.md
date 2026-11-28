@@ -87,6 +87,10 @@ report footer and into the first line of the digest.
 | `/page:N` | Open the window on section N |
 | `/shot:path.png`, `/shotsize:WxH` | Render the window to PNG (diagnostics) |
 
+Running it on a server where **only RDP is open** (no WinRM/WMI/SSH): there is a step-by-step
+guide in Russian — [docs/РАБОТА-С-СЕРВЕРОМ.md](docs/РАБОТА-С-СЕРВЕРОМ.md) — a tiny worker that
+picks up tasks from the project folder, the command list and how to wipe its traces afterwards.
+
 ## Sessions and licenses (rac)
 
 The **Usage → Sessions and licenses** tab lists active cluster sessions and the licenses
