@@ -61,6 +61,16 @@ internal static class RacStub
         "app-id         : 1CV8C\ninfobase       : 11111111-1111-1111-1111-111111111111\n" +
         "started-at     : 2026-11-27T18:40:12\n\n";
 
+    // Как на живом кластере 8.3.27: ответ с --licenses содержит только лицензионную часть,
+    // без информационной базы и времени начала. Список без --licenses — полный.
+    private const string SessionLicenseOnly =
+        "session            : aaaaaaaa-0000-0000-0000-000000000001\n" +
+        "user-name          : Сергей\napp-id             : 1CV8C\n" +
+        "license-type       : soft\nseries             : \"123456789\"\n" +
+        "issued-by-server   : yes\nmax-users-all      : 5\nmax-users-cur      : 5\n" +
+        "short-presentation : \"Сервер, 123456789 5 5\"\n" +
+        "full-presentation  : \"Сервер, 8732, ALL, 1541, 123456789 5 5, file://C:/ProgramData/1C/licenses/20210712132611.lic\"\n\n";
+
     private const string SessionLic =
         "session        : aaaaaaaa-0000-0000-0000-000000000001\n" +
         "session-id     : 3\nuser-name      : Сергей\nhost           : WORKPC\n" +
@@ -117,7 +127,7 @@ internal static class RacStub
                 // сеанс принадлежит только «Бухгалтерии»
                 if (a.IndexOf("11111111-1111", StringComparison.Ordinal) >= 0)
                 {
-                    if (a.IndexOf("--licenses", StringComparison.Ordinal) >= 0 && open) { Write(""); return 0; }
+                    if (a.IndexOf("--licenses", StringComparison.Ordinal) >= 0 && open) { Write(SessionLicenseOnly); return 0; }
                     Write(open ? SessionNoLic : SessionLic);
                 }
                 else Write("");
@@ -125,7 +135,7 @@ internal static class RacStub
             }
             if (needAdmin) Fail("Администратор кластера не аутентифицирован");
             // Главная особенность живого сервера: с --licenses успешный, но пустой ответ.
-            if (open && a.IndexOf("--licenses", StringComparison.Ordinal) >= 0) { Write(""); return 0; }
+            if (open && a.IndexOf("--licenses", StringComparison.Ordinal) >= 0) { Write(SessionLicenseOnly); return 0; }
             Write(open ? SessionNoLic : SessionLic);
             return 0;
         }

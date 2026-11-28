@@ -239,11 +239,11 @@ namespace OneCLicenseInspector.Ui
             _sessions = MakeGrid();
             _sessions.Columns.Add(Col("Инф. база", "Infobase", 100));
             _sessions.Columns.Add(Col("Номер", "SessionId", 70));
-            _sessions.Columns.Add(Col("Начало", "StartedAt", 140));
+            _sessions.Columns.Add(Col("Начало", "StartedAt", 118));
             _sessions.Columns.Add(Col("Компьютер", "Host", 110));
             _sessions.Columns.Add(Col("Пользователь", "User", 130));
-            _sessions.Columns.Add(Col("Приложение", "AppId", 110));
-            _sessions.Columns.Add(Col("Лицензия", "License", 80));
+            _sessions.Columns.Add(Col("Приложение", "AppId", 96));
+            _sessions.Columns.Add(Col("Лицензия", "License", 120));
             _sessions.Columns.Add(Col("Тип лиц.", "TypeCode", 65));
             _sessions.Columns.Add(Col("Рег. номер", "Pin", 110));
             _sessions.Columns.Add(Col("Мест", "Seats", 60));
@@ -566,13 +566,27 @@ namespace OneCLicenseInspector.Ui
                 row.AppId = s.AppId;
                 string licKind, licPin, licFile; int licUsed, licTotal;
                 Console82Import.ParseLicenseFull(s.LicenseShort, out licKind, out licPin, out licUsed, out licTotal, out licFile);
-                row.License = licKind.Length > 0 ? licKind : LicenseText(s);
-                row.Pin = licPin;
-                int sessCount; sessUse.TryGetValue(licPin, out sessCount);
-                row.Seats = licTotal >= 0 ? licTotal.ToString() : "";
-                row.TypeCode = licUsed >= 0 ? licUsed.ToString() : "";
-                row.Used = licPin.Length > 0 ? sessCount.ToString() : "";
-                row.Free = licTotal > 0 ? Math.Max(0, licTotal - sessCount).ToString() : "";
+                // 8.3 отдаёт лицензию структурными полями (тип, серия, места) — берём их,
+                // иначе строка «Сервер, 123456789 5 5» разбиралась бы 8.2-парсером неверно.
+                bool structured = !string.IsNullOrEmpty(s.LicenseSeries) || !string.IsNullOrEmpty(s.MaxUsersAll);
+                row.License = structured
+                    ? (string.IsNullOrEmpty(s.LicenseType) ? LicenseText(s) : s.LicenseType)
+                    : (licKind.Length > 0 ? licKind : LicenseText(s));
+                row.Pin = structured ? s.LicenseSeries : licPin;
+                int seats; int.TryParse(structured ? s.MaxUsersAll : (licTotal >= 0 ? licTotal.ToString() : ""), out seats);
+                int busy; int.TryParse(structured ? s.MaxUsersCur : "", out busy);
+                if (!structured)
+                {
+                    int sessCount; sessUse.TryGetValue(licPin, out sessCount);
+                    busy = licPin.Length > 0 ? sessCount : 0;
+                }
+                row.Seats = seats > 0 ? seats.ToString() : "";
+                row.TypeCode = "";
+                // Лицензия сервера описывает сервер, а не этот сеанс: «занято/свободно»
+                // для неё не выводим, чтобы «5 из 5» не читалось как «свободных мест нет».
+                bool serverLicence = s.IssuedByServer == "да";
+                row.Used = !serverLicence && busy > 0 ? busy.ToString() : "";
+                row.Free = !serverLicence && seats > 0 ? Math.Max(0, seats - busy).ToString() : "";
                 rows.Add(row);
             }
             _sessions.DataSource = null;

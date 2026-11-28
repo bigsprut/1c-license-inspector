@@ -236,6 +236,7 @@ namespace OneCLicenseInspector
                 bool got = false;      // был хотя бы один успешный (rc=0) ответ
                 bool hasData = false;  // в успешном ответе были сеансы
                 string licNote = "";
+                bool usedLicenses = false;
 
                 string[][] creds = new string[][]
                 {
@@ -262,7 +263,7 @@ namespace OneCLicenseInspector
                         {
                             // --licenses на части кластеров возвращает успешный, но ПУСТОЙ ответ.
                             // Тогда повторяем без него: список сеансов важнее сведений о лицензиях.
-                            foreach (bool licenses in new bool[] { true, false })
+                            foreach (bool licenses in new bool[] { false, true })
                             {
                                 string a = SessionArgs(endpoint, e.Id, cr[0], cr[1], newStyle, licenses);
                                 string so2, se2;
@@ -283,8 +284,9 @@ namespace OneCLicenseInspector
                                     {
                                         so = so2; se = se2; rc = rc2; loginUsed = cr[0]; racUsed = racPath;
                                         hasData = true;
-                                        if (!licenses)
-                                            licNote = "Кластер не отдаёт сведения о лицензиях через rac (запрос с --licenses вернул пусто) — сеансы прочитаны без них.";
+                                        usedLicenses = licenses;
+                                        if (licenses)
+                                            licNote = "Список сеансов взят из запроса без --licenses: ответ с --licenses содержит только лицензионную часть.";
                                         break;
                                     }
                                 }
@@ -360,23 +362,32 @@ namespace OneCLicenseInspector
                     s.Infobase = baseNames.TryGetValue(s.InfobaseId, out baseName) && baseName.Length > 0
                         ? baseName : s.InfobaseId;
                     s.StartedAt = rec.Get("started-at");
-                    s.LicenseType = rec.Get("license-type");
-                    s.LicenseSeries = rec.Get("series");
-                    s.LicenseFullName = rec.Get("full-name");
-                    s.IssuedByServer = rec.Get("issued-by-server");
-                    s.MaxUsersAll = rec.Get("max-users-all");
-                    s.MaxUsersCur = rec.Get("max-users-cur");
-                    s.LicenseShort = StripQuotes(rec.Get("short-presentation"));
-                    s.LicenseFull = StripQuotes(rec.Get("full-presentation"));
-                    if (string.IsNullOrEmpty(s.LicenseShort) && !string.IsNullOrEmpty(s.LicenseSeries))
-                        s.LicenseShort = s.LicenseSeries + " " + s.MaxUsersCur + " " + s.MaxUsersAll;
+                    ApplyLicense(s, rec);
                     c.Sessions.Add(s);
                 }
 
-                // Список сеансов без --licenses не содержит сведений о лицензиях, а сам --licenses
-                // на части кластеров отдаёт пусто. Пробуем добрать лицензию по каждому сеансу:
-                // session info --session=<uuid> --licenses.
-                if (licNote.Length > 0 && c.Sessions.Count > 0)
+                // Лицензионные поля сеансу rac отдаёт отдельным ответом (--licenses): на этом
+                // кластере он содержит только лицензионную часть. Запрашиваем его один раз
+                // и переносим данные в уже разобранные сеансы по UUID.
+                if (!usedLicenses && c.Sessions.Count > 0)
+                {
+                    string racForLic = racUsed.Length > 0 ? racUsed : c.RacPath;
+                    bool newStyle = true;
+                    string la = SessionArgs(endpoint, e.Id, loginUsed, password, newStyle, true);
+                    string lo, le;
+                    int lrc = Exec.Run(racForLic, la, 12000, out lo, out le);
+                    Diag.Log("rac session list --licenses (для лицензий): rc=" + lrc + " out=" + (lo ?? "").Trim());
+                    if (lrc == 0 && !LooksLikeError(lo, le))
+                    {
+                        int merged = MergeLicenses(c.Sessions, lo);
+                        Diag.Log("licenses merged: " + merged);
+                        if (merged > 0 && string.IsNullOrEmpty(licNote))
+                            licNote = "Лицензии по сеансам получены отдельным запросом (rac отдаёт их не в общем списке).";
+                    }
+                }
+
+                // Фолбэк: если лицензии всё ещё не пришли — спрашиваем по каждому сеансу.
+                if (c.Sessions.Count > 0 && SessionsLackLicense(c.Sessions))
                 {
                     string racForInfo = racUsed.Length > 0 ? racUsed : c.RacPath;
                     int filled = 0, asked = 0;
@@ -399,26 +410,18 @@ namespace OneCLicenseInspector
                         if (irc != 0) continue;
                         List<Record> one = ParseRecords(io, "session");
                         if (one.Count == 0) continue;
-                        Record r2 = one[0];
-                        s.LicenseType = r2.Get("license-type");
-                        s.LicenseSeries = r2.Get("series");
-                        s.LicenseFullName = r2.Get("full-name");
-                        s.IssuedByServer = r2.Get("issued-by-server");
-                        s.MaxUsersAll = r2.Get("max-users-all");
-                        s.MaxUsersCur = r2.Get("max-users-cur");
-                        s.LicenseShort = StripQuotes(r2.Get("short-presentation"));
-                        s.LicenseFull = StripQuotes(r2.Get("full-presentation"));
-                        if (string.IsNullOrEmpty(s.LicenseShort) && !string.IsNullOrEmpty(s.LicenseSeries))
-                            s.LicenseShort = s.LicenseSeries + " " + s.MaxUsersCur + " " + s.MaxUsersAll;
+                        ApplyLicense(s, one[0]);
                         if (!string.IsNullOrEmpty(s.LicenseType) || !string.IsNullOrEmpty(s.LicenseSeries)) filled++;
                     }
                     Diag.Log("rac session info: опрошено " + asked + ", с лицензией " + filled);
                     if (filled > 0)
                     {
-                        c.Note = (c.Note + " Сведения о лицензиях добраны по каждому сеансу (session info --licenses).").Trim();
-                        r.AddLog(LogLevel.Info, "Кластер", "Лицензии получены по сеансам: " + filled);
+                        string note = "Сведения о лицензиях добраны по каждому сеансу (session info --licenses).";
+                        licNote = string.IsNullOrEmpty(licNote) ? note : licNote + " " + note;
                     }
+                    if (filled > 0) r.AddLog(LogLevel.Info, "Кластер", "Лицензии получены по сеансам: " + filled);
                 }
+
             }
             r.AddLog(LogLevel.Info, "Кластер", "Сеансов: " + c.Sessions.Count);
         }
@@ -522,6 +525,80 @@ namespace OneCLicenseInspector
             long n;
             if (!long.TryParse((v ?? "").Trim(), out n) || n <= 0) return "";
             return (n / 1024).ToString("0");
+        }
+
+        /// <summary>
+        /// Переносит лицензионные поля из записи rac в сеанс. Значения из API английские
+        /// («soft», «yes»), а серия приходит в кавычках — для UI приводим к человеческому виду.
+        /// </summary>
+        private static void ApplyLicense(SessionEntry s, Record rec)
+        {
+            if (s == null || rec == null) return;
+            string type = rec.Get("license-type");
+            if (type.Length > 0) s.LicenseType = RuLicenseType(type);
+            string series = StripQuotes(rec.Get("series"));
+            if (series.Length > 0) s.LicenseSeries = series;
+            string full = StripQuotes(rec.Get("full-name"));
+            if (full.Length > 0) s.LicenseFullName = full;
+            string issued = rec.Get("issued-by-server");
+            if (issued.Length > 0) s.IssuedByServer = RuYesNo(issued);
+            string all = rec.Get("max-users-all");
+            if (all.Length > 0) s.MaxUsersAll = all;
+            string cur = rec.Get("max-users-cur");
+            if (cur.Length > 0) s.MaxUsersCur = cur;
+            string shortP = StripQuotes(rec.Get("short-presentation"));
+            if (shortP.Length > 0) s.LicenseShort = shortP;
+            string fullP = StripQuotes(rec.Get("full-presentation"));
+            if (fullP.Length > 0) s.LicenseFull = fullP;
+            if (string.IsNullOrEmpty(s.LicenseShort) && !string.IsNullOrEmpty(s.LicenseSeries))
+                s.LicenseShort = s.LicenseSeries + " " + s.MaxUsersCur + " " + s.MaxUsersAll;
+        }
+
+        /// <summary>Переносит лицензии из ответа `session list --licenses` в сеансы по UUID.</summary>
+        private static int MergeLicenses(List<SessionEntry> sessions, string output)
+        {
+            Dictionary<string, Record> byId = new Dictionary<string, Record>(StringComparer.OrdinalIgnoreCase);
+            foreach (Record rec in ParseRecords(output, "session"))
+            {
+                string id = rec.Get("session");
+                if (id.Length > 0) byId[id] = rec;
+            }
+            int merged = 0;
+            foreach (SessionEntry s in sessions)
+            {
+                Record rec;
+                if (string.IsNullOrEmpty(s.SessionId) || !byId.TryGetValue(s.SessionId, out rec)) continue;
+                ApplyLicense(s, rec);
+                merged++;
+            }
+            return merged;
+        }
+
+        private static bool SessionsLackLicense(List<SessionEntry> sessions)
+        {
+            foreach (SessionEntry s in sessions)
+            {
+                if (string.IsNullOrEmpty(s.LicenseType) && string.IsNullOrEmpty(s.LicenseSeries)) return true;
+            }
+            return false;
+        }
+
+        private static string RuLicenseType(string v)
+        {
+            string s = (v ?? "").Trim();
+            if (s.Equals("soft", StringComparison.OrdinalIgnoreCase) || s.Equals("software", StringComparison.OrdinalIgnoreCase)) return "программная";
+            if (s.Equals("hasp", StringComparison.OrdinalIgnoreCase)) return "аппаратная";
+            if (s.Equals("net", StringComparison.OrdinalIgnoreCase) || s.Equals("network", StringComparison.OrdinalIgnoreCase)) return "сетевая";
+            if (s.Equals("combo", StringComparison.OrdinalIgnoreCase)) return "комбинированная";
+            return s;
+        }
+
+        private static string RuYesNo(string v)
+        {
+            string s = (v ?? "").Trim();
+            if (s.Equals("yes", StringComparison.OrdinalIgnoreCase)) return "да";
+            if (s.Equals("no", StringComparison.OrdinalIgnoreCase)) return "нет";
+            return s;
         }
 
         /// <summary>
