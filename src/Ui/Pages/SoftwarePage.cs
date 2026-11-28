@@ -24,7 +24,18 @@ namespace OneCLicenseInspector.Ui
 
         public SoftwarePage()
         {
-            AddHeader("Программные лицензии", "Файлы лицензий 1С (*.lic): где лежат, когда активированы, в каком состоянии");
+            AddHeader("Программные лицензии", "Сколько мест в лицензиях 8.2 и кто их занял (данные консоли администрирования), плюс файлы лицензий 1С");
+            // Главная таблица для 8.2 — сразу под заголовком: файлы 8.2 зашифрованы, но консоль
+            // администрирования показывает серию, места и занятость — показываем их.
+            _p82 = MakeGrid();
+            _p82.Columns.Add(Col("Рег. номер", "Pin", 140));
+            _p82.Columns.Add(Col("Мест", "Seats", 70));
+            _p82.Columns.Add(Col("Занято", "Used", 80));
+            _p82.Columns.Add(Col("Свободно", "Free", 90));
+            _p82.Columns.Add(Col("Файл лицензии", "File", 260));
+            _p82Section = WithTitle("Лицензии 1С 8.2 — по данным консоли администрирования (файлы *.lic в 8.2 зашифрованы)", Card(_p82, new Padding(1)));
+            _p82Row = AddRow(_p82Section, 0);
+            AddSpacer(6);
 
             _info = new KeyValueList();
             _infoRow = AddRow(WithTitle("Каталоги лицензий и привязка", Card(_info, new Padding(0))), 128);
@@ -71,16 +82,7 @@ namespace OneCLicenseInspector.Ui
             _ring.Dock = DockStyle.Fill;
             EnableCopy(_ring);
             _ringRow = AddRow(WithTitle("Вывод утилиты лицензирования ring", Card(_ring, new Padding(10))), 126);
-            // Отдельная таблица для 8.2: файлы лицензий 8.2 зашифрованы, но консоль
-            // администрирования показывает серию, места и занятость — показываем их.
-            _p82 = MakeGrid();
-            _p82.Columns.Add(Col("Рег. номер", "Pin", 140));
-            _p82.Columns.Add(Col("Мест", "Seats", 70));
-            _p82.Columns.Add(Col("Занято", "Used", 80));
-            _p82.Columns.Add(Col("Свободно", "Free", 90));
-            _p82.Columns.Add(Col("Файл лицензии", "File", 260));
-            _p82Section = WithTitle("Лицензии по данным консоли 8.2 — файлы *.lic в 8.2 зашифрованы, поэтому серия и места берутся из консоли", Card(_p82, new Padding(1)));
-            _p82Row = AddRow(_p82Section, 0);
+
         }
 
         private DataGridViewColumn Col(string header, string prop, int weight)
@@ -173,23 +175,6 @@ namespace OneCLicenseInspector.Ui
             info.Add(new KeyValuePair<string, string>("Занято / свободно", clientUsage));
             info.Add(new KeyValuePair<string, string>("Серверная лицензия", (serverTotal > 0 ? "есть (" + serverTotal + ")" : "не найдена") + (serverRunning ? " · занята работающим сервером (rphost/rmngr)" : " · сервер 1С не запущен, лицензия свободна")));
             info.Add(new KeyValuePair<string, string>("Места в аппаратных ключах", seats));
-            // Итог по 8.2 сразу в верхней карточке: файлы 8.2 зашифрованы, а места и занятость
-            // видны только в консоли администрирования.
-            List<License82Row> lic82 = CollectLicenses.Build82(r);
-            foreach (License82Row row82 in lic82)
-            {
-                if (row82.IsServer)
-                {
-                    info.Add(new KeyValuePair<string, string>("Серверная лицензия (консоль 8.2)",
-                        "PIN " + row82.Pin + (row82.Seats.Length > 0 ? " · мест " + row82.Seats : "") + " · занята работающим сервером"));
-                }
-                else
-                {
-                    info.Add(new KeyValuePair<string, string>("Клиентские места (консоль 8.2)",
-                        "PIN " + row82.Pin + " · занято " + row82.Used + (row82.Seats.Length > 0 ? " из " + row82.Seats : "") +
-                        (row82.Free.Length > 0 ? " · свободно " + row82.Free : "")));
-                }
-            }
             info.Add(new KeyValuePair<string, string>("Каталоги поиска",
                 r.LicenseStorages.Count == 0 ? "стандартные каталоги отсутствуют" : Fmt.ShortList(r.LicenseStorages, 3)));
             info.Add(new KeyValuePair<string, string>("Отпечаток ПК",

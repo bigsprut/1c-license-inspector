@@ -112,7 +112,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.5.43";
+        public const string Version = "1.5.44";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -288,6 +288,14 @@ namespace OneCLicenseInspector
                 if (!string.IsNullOrEmpty(shot))
                 {
                     ScanResult sr = Scanner.Run(null);
+                    if (Has(args, "/demo82"))
+                    {
+                        // демонстрационные строки консоли 8.2 для скриншотов
+                        SessionEntry p1 = new SessionEntry(); p1.User = "SERVER"; p1.Host = ":1565"; p1.SessionId = "4868"; p1.AppId = "Использовать"; p1.Enabled = "Да"; p1.Active = "Да"; p1.LicenseShort = "Сервер, 0000000000 1 1";
+                        SessionEntry s1 = new SessionEntry(); s1.User = "Пользователь 1"; s1.Host = "PC-1"; s1.Infobase = "buh"; s1.SessionId = "7431"; s1.AppId = "Тонкий клиент"; s1.StartedAt = "25.11.2026 10:12:46"; s1.LicenseShort = "Сервер, 1111111111 20 20";
+                        sr.Cluster.Processes.Add(p1);
+                        sr.Cluster.Sessions.Add(s1);
+                    }
                 MaskForDemo(sr);
                         SanitizeForDemo(sr);                    using (Ui.MainForm f = new Ui.MainForm(page))
                     {
