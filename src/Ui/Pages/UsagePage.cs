@@ -213,18 +213,20 @@ namespace OneCLicenseInspector.Ui
 
             _procs = MakeGrid();
             _procs.Columns.Add(Col("Компьютер", "Computer", 100));
-            _procs.Columns.Add(Col("Порт", "Port", 60));
-            _procs.Columns.Add(Col("Использование", "Usage", 100));
+            _procs.Columns.Add(Col("Порт", "Port", 55));
+            _procs.Columns.Add(Col("Использование", "Usage", 95));
             _procs.Columns.Add(Col("Включен", "Enabled", 70));
             _procs.Columns.Add(Col("Активен", "Active", 70));
-            _procs.Columns.Add(Col("PID", "Pid", 60));
-            _procs.Columns.Add(Col("Память, KB", "Memory", 85));
-            _procs.Columns.Add(Col("Лицензия", "License", 80));
-            _procs.Columns.Add(Col("Тип лиц.", "TypeCode", 65));
-            _procs.Columns.Add(Col("Рег. номер", "Pin", 110));
-            _procs.Columns.Add(Col("Мест", "Seats", 60));
-            _procs.Columns.Add(Col("Занято", "Used", 60));
-            _procs.Columns.Add(Col("Свободно", "Free", 60));
+            _procs.Columns.Add(Col("PID", "Pid", 55));
+            _procs.Columns.Add(Col("Память, KB", "Memory", 80));
+            _procs.Columns.Add(Col("Лицензия", "License", 70));
+            _procs.Columns.Add(Col("Рег. номер", "Pin", 95));
+            // Места и занятость — одной колонкой: три отдельных столбца не помещались,
+            // а «Свободно» у серверной лицензии всегда считалось от занятости процессов.
+            DataGridViewColumn procSeats = Col("Мест / занято", "SeatsBusy", 85);
+            procSeats.ToolTipText = "Слева — ёмкость лицензии, справа — сколько её держат процессы. " +
+                                    "У серверной лицензии «занято» — это работающий сервер, а не сеансы.";
+            _procs.Columns.Add(procSeats);
             _procs.Dock = DockStyle.Top;
             _procs.Height = 150;
 
@@ -238,22 +240,20 @@ namespace OneCLicenseInspector.Ui
 
             _sessions = MakeGrid();
             _sessions.Columns.Add(Col("Инф. база", "Infobase", 100));
-            _sessions.Columns.Add(Col("Номер", "SessionId", 70));
-            _sessions.Columns.Add(Col("Начало", "StartedAt", 118));
-            _sessions.Columns.Add(Col("Компьютер", "Host", 110));
-            DataGridViewColumn sessIp = Col("IP", "ClientIp", 88);
-            sessIp.ToolTipText = "Адрес клиента из rac (client-ip). У спящего сеанса имя компьютера " +
-                                 "1С не отдаёт совсем — адрес остаётся единственной приметой машины.";
-            _sessions.Columns.Add(sessIp);
-            _sessions.Columns.Add(Col("Пользователь", "User", 130));
-            _sessions.Columns.Add(Col("Приложение", "AppId", 92));
-            _sessions.Columns.Add(Col("Состояние", "State", 78));
-            _sessions.Columns.Add(Col("Лицензия", "License", 120));
-            _sessions.Columns.Add(Col("Тип лиц.", "TypeCode", 65));
-            _sessions.Columns.Add(Col("Рег. номер", "Pin", 110));
-            _sessions.Columns.Add(Col("Мест", "Seats", 60));
-            _sessions.Columns.Add(Col("Занято", "Used", 60));
-            _sessions.Columns.Add(Col("Свободно", "Free", 60));
+            _sessions.Columns.Add(Col("Номер", "SessionId", 60));
+            _sessions.Columns.Add(Col("Начало", "StartedAt", 100));
+            _sessions.Columns.Add(Col("Компьютер", "Host", 105));
+            // «IP» и «Лицензия» убраны с пятой страницы в 1.5.58: адрес клиента и тип лицензии
+            // видны в карточке сеанса ниже, а в таблице 13 столбцов не помещались (подписи
+            // обрезались до «Пользовате…», «Тонки…», «программ…»).
+            _sessions.Columns.Add(Col("Пользователь", "User", 140));
+            _sessions.Columns.Add(Col("Приложение", "AppId", 110));
+            _sessions.Columns.Add(Col("Состояние", "State", 85));
+            _sessions.Columns.Add(Col("Рег. номер", "Pin", 100));
+            DataGridViewColumn sessSeats = Col("Мест / занято", "SeatsBusy", 90);
+            sessSeats.ToolTipText = "Слева — ёмкость лицензии, справа — сколько сеансов её держат. " +
+                                    "У серверной лицензии вместо числа «сервер».";
+            _sessions.Columns.Add(sessSeats);
             _sessions.Dock = DockStyle.Fill;
             _sessions.SelectionChanged += delegate { ShowSessionDetails(); };
 
@@ -549,11 +549,9 @@ namespace OneCLicenseInspector.Ui
                 pr.Pin = pp;
                 int procCount; procUse.TryGetValue(pp, out procCount);
                 pr.Seats = pt >= 0 ? pt.ToString() : "";
-                pr.TypeCode = pu >= 0 ? pu.ToString() : "";
                 // «Занято» считается по PIN лицензии: если лицензии у процесса нет (8.3),
                 // не показываем ноль — иначе столбец выглядит как «ничего не занято».
                 pr.Used = pp.Length > 0 ? procCount.ToString() : "";
-                pr.Free = pt > 0 ? Math.Max(0, pt - procCount).ToString() : "";
                 prows.Add(pr);
             }
             _procs.DataSource = null;
@@ -584,7 +582,6 @@ namespace OneCLicenseInspector.Ui
                 row.SessionId = string.IsNullOrEmpty(s.SessionNum) ? ShortId(s.SessionId) : s.SessionNum;
                 row.StartedAt = ShortDate(s.StartedAt);
                 row.Host = s.Host;
-                row.ClientIp = CollectCluster.NormalizeIp(s.ClientIp);
                 row.User = string.IsNullOrEmpty(s.User) ? "—" : s.User;
                 row.AppId = Fmt.AppName(s.AppId);
                 string licKind, licPin, licFile; int licUsed, licTotal;
@@ -594,11 +591,6 @@ namespace OneCLicenseInspector.Ui
                 bool structured = !string.IsNullOrEmpty(s.LicenseSeries) || !string.IsNullOrEmpty(s.MaxUsersAll);
                 bool sleeping = string.Equals(s.Hibernate, "yes", StringComparison.OrdinalIgnoreCase);
                 row.State = sleeping ? "спит" : "активен";
-                // У спящего сеанса 1С освобождает клиентскую лицензию — это не ошибка чтения,
-                // поэтому вместо прочерка пишем причину.
-                row.License = structured
-                    ? (string.IsNullOrEmpty(s.LicenseType) ? LicenseText(s) : s.LicenseType)
-                    : (licKind.Length > 0 ? licKind : (sleeping ? "не выдана (спит)" : LicenseText(s)));
                 row.Pin = structured ? s.LicenseSeries : licPin;
                 int seats; int.TryParse(structured ? s.MaxUsersAll : (licTotal >= 0 ? licTotal.ToString() : ""), out seats);
                 int busy; int.TryParse(structured ? s.MaxUsersCur : "", out busy);
@@ -608,12 +600,10 @@ namespace OneCLicenseInspector.Ui
                     busy = licPin.Length > 0 ? sessCount : 0;
                 }
                 row.Seats = seats > 0 ? seats.ToString() : "";
-                row.TypeCode = "";
-                // Лицензия сервера описывает сервер, а не этот сеанс: «занято/свободно»
-                // для неё не выводим, чтобы «5 из 5» не читалось как «свободных мест нет».
+                // Лицензия сервера описывает сервер, а не этот сеанс: «занято» для неё
+                // не выводим, чтобы «5 из 5» не читалось как «свободных мест нет».
                 bool serverLicence = s.IssuedByServer == "да";
                 row.Used = !serverLicence && busy > 0 ? busy.ToString() : "";
-                row.Free = !serverLicence && seats > 0 ? Math.Max(0, seats - busy).ToString() : "";
                 rows.Add(row);
             }
             _sessions.DataSource = null;
@@ -696,13 +686,6 @@ namespace OneCLicenseInspector.Ui
                 return d.ToString("dd.MM HH:mm");
             }
             return s.Length > 16 ? s.Substring(0, 16) : s;
-        }
-        private static string LicenseText(SessionEntry s)
-        {
-            if (!string.IsNullOrEmpty(s.LicenseShort)) return s.LicenseShort;
-            string t = (s.LicenseType + " " + s.LicenseSeries + " " + s.LicenseFullName).Trim();
-            if (t.Length == 0) return "—";
-            return t;
         }
 
         private void ShowSessionDetails()
@@ -920,17 +903,25 @@ namespace OneCLicenseInspector.Ui
             public string SessionId { get; set; }
             public string StartedAt { get; set; }
             public string Host { get; set; }
-            /// <summary>Адрес клиента: у спящего сеанса имя компьютера 1С не отдаёт.</summary>
-            public string ClientIp { get; set; }
             public string User { get; set; }
             public string AppId { get; set; }
             public string State { get; set; }
-            public string License { get; set; }
-            public string TypeCode { get; set; }
             public string Pin { get; set; }
             public string Used { get; set; }
             public string Seats { get; set; }
-            public string Free { get; set; }
+            /// <summary>Столбец «Мест / занято»: ёмкость лицензии и число сеансов на ней.</summary>
+            public string SeatsBusy
+            {
+                get
+                {
+                    string s = Seats ?? "";
+                    string b = Used ?? "";
+                    if (s.Length == 0 && b.Length == 0) return "";
+                    if (s.Length == 0) return b;
+                    if (b.Length == 0) return s;
+                    return s + " / " + b;
+                }
+            }
         }
 
         public class ProcessRow
@@ -943,11 +934,22 @@ namespace OneCLicenseInspector.Ui
             public string Pid { get; set; }
             public string Memory { get; set; }
             public string License { get; set; }
-            public string TypeCode { get; set; }
             public string Pin { get; set; }
             public string Used { get; set; }
             public string Seats { get; set; }
-            public string Free { get; set; }
+            /// <summary>Столбец «Мест / занято»: сколько мест в лицензии и сколько занято процессами.</summary>
+            public string SeatsBusy
+            {
+                get
+                {
+                    string s = Seats ?? "";
+                    string b = Used ?? "";
+                    if (s.Length == 0 && b.Length == 0) return "";
+                    if (s.Length == 0) return b;
+                    if (b.Length == 0) return s;
+                    return s + " / " + b;
+                }
+            }
         }
     }
 
