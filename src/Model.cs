@@ -364,3 +364,19 @@ namespace OneCLicenseInspector
         public string Raw = "";
     }
 }
+
+    /// <summary>Лицензия, прочитанная из консоли администрирования 8.2 (файлы 8.2 зашифрованы).</summary>
+    public class License82Row
+    {
+        // Именно свойства: DataGridView привязывается по свойствам, а поля игнорирует —
+        // из-за этого таблица 8.2 однажды осталась пустой.
+        public string Pin { get; set; }
+        public string Seats { get; set; }
+        public string Used { get; set; }
+        public string Free { get; set; }
+        public string File { get; set; }
+        /// <summary>Серверная лицензия: её занимает работающий сервер, а не сеансы.</summary>
+        public bool IsServer { get; set; }
+        public int SeatsNum { get; set; }
+        public int UsedNum { get; set; }
+    }

@@ -366,6 +366,72 @@ namespace OneCLicenseInspector
             }
         }
 
+        /// <summary>
+        /// Сводка по лицензиям из консоли администрирования 8.2. Клиентские считаются по строкам
+        /// сеансов (сколько сеансов держат PIN), серверная — по строкам рабочих процессов:
+        /// её занимает работающий сервер, поэтому «занято» у неё не считается числом сеансов.
+        /// </summary>
+        public static List<License82Row> Build82(ScanResult r)
+        {
+            List<License82Row> list = new List<License82Row>();
+            if (r == null || r.Cluster == null) return list;
+
+            Dictionary<string, License82Row> byPin = new Dictionary<string, License82Row>(StringComparer.OrdinalIgnoreCase);
+            foreach (SessionEntry se in r.Cluster.Sessions)
+            {
+                if (!string.IsNullOrEmpty(se.LicenseSeries)) continue;       // это 8.3
+                if (string.IsNullOrEmpty(se.LicenseShort)) continue;
+                string kind, pin, file; int used, total;
+                Console82Import.ParseLicenseFull(se.LicenseShort, out kind, out pin, out used, out total, out file);
+                if (pin.Length == 0) continue;
+                License82Row row;
+                if (!byPin.TryGetValue(pin, out row))
+                {
+                    row = new License82Row();
+                    row.Pin = pin;
+                    byPin[pin] = row;
+                    list.Add(row);
+                }
+                row.UsedNum++;
+                if (total > row.SeatsNum) row.SeatsNum = total;
+                if (string.IsNullOrEmpty(row.File)) row.File = file;
+            }
+
+            foreach (SessionEntry se in r.Cluster.Processes)
+            {
+                if (!string.IsNullOrEmpty(se.LicenseSeries)) continue;
+                if (string.IsNullOrEmpty(se.LicenseShort)) continue;
+                string kind, pin, file; int used, total;
+                Console82Import.ParseLicenseFull(se.LicenseShort, out kind, out pin, out used, out total, out file);
+                if (pin.Length == 0) continue;
+                License82Row hit = null;
+                foreach (License82Row row in list)
+                {
+                    if (string.Equals(row.Pin, pin, StringComparison.OrdinalIgnoreCase)) { hit = row; break; }
+                }
+                if (hit != null)
+                {
+                    hit.IsServer = true;
+                    if (total > hit.SeatsNum) hit.SeatsNum = total;
+                    continue;
+                }
+                License82Row srv = new License82Row();
+                srv.Pin = pin;
+                srv.SeatsNum = total;
+                srv.IsServer = true;
+                srv.File = file;
+                list.Add(srv);
+            }
+
+            foreach (License82Row row in list)
+            {
+                row.Seats = row.SeatsNum > 0 ? row.SeatsNum.ToString() : "";
+                row.Used = row.IsServer ? "сервер" : row.UsedNum.ToString();
+                row.Free = row.IsServer ? "" : (row.SeatsNum > 0 ? Math.Max(0, row.SeatsNum - row.UsedNum).ToString() : "");
+            }
+            return list;
+        }
+
         /// <summary>Только имя файла из строки вида «file://C:/…/20210712132611.lic».</summary>
         internal static string FileNameOf(string path)
         {

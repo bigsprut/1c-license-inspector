@@ -173,6 +173,23 @@ namespace OneCLicenseInspector.Ui
             info.Add(new KeyValuePair<string, string>("Занято / свободно", clientUsage));
             info.Add(new KeyValuePair<string, string>("Серверная лицензия", (serverTotal > 0 ? "есть (" + serverTotal + ")" : "не найдена") + (serverRunning ? " · занята работающим сервером (rphost/rmngr)" : " · сервер 1С не запущен, лицензия свободна")));
             info.Add(new KeyValuePair<string, string>("Места в аппаратных ключах", seats));
+            // Итог по 8.2 сразу в верхней карточке: файлы 8.2 зашифрованы, а места и занятость
+            // видны только в консоли администрирования.
+            List<License82Row> lic82 = CollectLicenses.Build82(r);
+            foreach (License82Row row82 in lic82)
+            {
+                if (row82.IsServer)
+                {
+                    info.Add(new KeyValuePair<string, string>("Серверная лицензия (консоль 8.2)",
+                        "PIN " + row82.Pin + (row82.Seats.Length > 0 ? " · мест " + row82.Seats : "") + " · занята работающим сервером"));
+                }
+                else
+                {
+                    info.Add(new KeyValuePair<string, string>("Клиентские места (консоль 8.2)",
+                        "PIN " + row82.Pin + " · занято " + row82.Used + (row82.Seats.Length > 0 ? " из " + row82.Seats : "") +
+                        (row82.Free.Length > 0 ? " · свободно " + row82.Free : "")));
+                }
+            }
             info.Add(new KeyValuePair<string, string>("Каталоги поиска",
                 r.LicenseStorages.Count == 0 ? "стандартные каталоги отсутствуют" : Fmt.ShortList(r.LicenseStorages, 3)));
             info.Add(new KeyValuePair<string, string>("Отпечаток ПК",
@@ -254,48 +271,13 @@ namespace OneCLicenseInspector.Ui
             if (rows.Count > 0) _grid.Rows[0].Selected = true;
             ShowDetails();
 
-            // Сводка по лицензиям из консоли 8.2: группируем импортированные строки по PIN
-            // (или по файлу), места берём максимальные из консольных записей.
-            List<P82Row> p82rows = new List<P82Row>();
-            if (r.Cluster != null)
-            {
-                Dictionary<string, P82Row> groups = new Dictionary<string, P82Row>(StringComparer.OrdinalIgnoreCase);
-                List<SessionEntry> imported = new List<SessionEntry>();
-                imported.AddRange(r.Cluster.Sessions);
-                imported.AddRange(r.Cluster.Processes);
-                foreach (SessionEntry se in imported)
-                {
-                    if (!string.IsNullOrEmpty(se.LicenseSeries)) continue;      // это 8.3
-                    if (string.IsNullOrEmpty(se.LicenseShort)) continue;
-                    string kind, pin, file; int used, total;
-                    Console82Import.ParseLicenseFull(se.LicenseShort, out kind, out pin, out used, out total, out file);
-                    if (pin.Length == 0 && string.IsNullOrEmpty(file)) continue;
-                    string key = pin.Length > 0 ? pin : file;
-                    P82Row row;
-                    if (!groups.TryGetValue(key, out row))
-                    {
-                        row = new P82Row();
-                        row.Pin = key;
-                        row.File = file;
-                        groups[key] = row;
-                        p82rows.Add(row);
-                    }
-                    row.Count++;
-                    if (total > row.SeatsNum) row.SeatsNum = total;
-                    if (row.File.Length == 0 && file.Length > 0) row.File = file;
-                }
-                foreach (P82Row row in p82rows)
-                {
-                    row.Seats = row.SeatsNum > 0 ? row.SeatsNum.ToString() : "";
-                    row.Used = row.Count.ToString();
-                    row.Free = row.SeatsNum > 0 ? Math.Max(0, row.SeatsNum - row.Count).ToString() : "";
-                }
-            }
+            // Лицензии по данным консоли 8.2: клиентские — по сеансам, серверная — «занята сервером».
+            List<License82Row> p82rows = CollectLicenses.Build82(r);
             _p82.DataSource = null;
             _p82.DataSource = p82rows;
             HideEmptyColumns(_p82, p82rows);
             if (_p82Section != null) _p82Section.Visible = p82rows.Count > 0;
-            SetRowHeight(_p82Row, p82rows.Count > 0 ? 30 + 22 + FitGridHeight(_p82, p82rows.Count, 96, 260) : 0);
+            SetRowHeight(_p82Row, p82rows.Count > 0 ? 30 + FitGridHeight(_p82, p82rows.Count, 96, 260) : 0);
             // Панель вывода ring подстраиваем под число строк — пустое поле на пол-экрана не нужно.
             int ringLines = 3;
             if (!string.IsNullOrEmpty(_ring.Text)) ringLines = _ring.Text.Replace("\r", "").Split('\n').Length;

@@ -44,8 +44,22 @@ namespace OneCLicenseInspector
                 }
                 b.AppendLine();
             }
-            // Лицензии по данным консоли 8.2: файлы *.lic в 8.2 зашифрованы, поэтому серия,
-            // места и занятость берутся из консоли администрирования.
+            // Лицензии по данным консоли 8.2: клиентские считаются по сеансам,
+            // серверная — «занята работающим сервером».
+            List<License82Row> lic82 = CollectLicenses.Build82(r);
+            if (lic82.Count > 0)
+            {
+                b.AppendLine("Лицензии по данным консоли 8.2 (файлы *.lic в 8.2 зашифрованы):");
+                foreach (License82Row row in lic82)
+                {
+                    b.AppendLine("  " + row.Pin +
+                                 (row.Seats.Length > 0 ? " · мест " + row.Seats : "") +
+                                 (row.IsServer ? " · занята работающим сервером"
+                                               : " · занято " + row.Used + (row.Free.Length > 0 ? " · свободно " + row.Free : "")) +
+                                 (row.File.Length > 0 ? " · " + row.File : ""));
+                }
+                b.AppendLine();
+            }
             if (r.Cluster != null)
             {
                 Dictionary<string, int[]> pins82 = new Dictionary<string, int[]>(StringComparer.OrdinalIgnoreCase);

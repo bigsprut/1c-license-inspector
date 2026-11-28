@@ -112,7 +112,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.5.42";
+        public const string Version = "1.5.43";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -180,6 +180,24 @@ namespace OneCLicenseInspector
                     string mmcOut = Arg(args, "/mmcout");
                     string dump = table != null ? table : ("ERROR: " + mmcError);
                     if (!string.IsNullOrEmpty(mmcOut)) File.WriteAllText(mmcOut, dump, Encoding.UTF8);
+                    return 0;
+                }
+                string test82 = Arg(args, "/82test");
+                if (!string.IsNullOrEmpty(test82))
+                {
+                    string[] parts = test82.Split('|');
+                    ScanResult tmp = new ScanResult();
+                    foreach (string part in parts)
+                    {
+                        if (part.Trim().Length == 0 || !File.Exists(part.Trim())) continue;
+                        string txt = File.ReadAllText(part.Trim(), Encoding.UTF8);
+                        string sum;
+                        bool ok = Console82Apply.TryApply(tmp, txt, out sum);
+                        Console.WriteLine("apply " + Path.GetFileName(part) + ": " + ok + " — " + sum);
+                    }
+                    Console.WriteLine("--- итог ---");
+                    foreach (License82Row row in CollectLicenses.Build82(tmp))
+                        Console.WriteLine("PIN " + row.Pin + " | мест " + row.Seats + " | занято " + row.Used + " | свободно " + row.Free + " | серверная=" + row.IsServer);
                     return 0;
                 }
                 string imp82 = Arg(args, "/imp82");
