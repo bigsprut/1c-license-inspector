@@ -20,7 +20,6 @@ if (-not $SkipBuild) {
     Step 'Сборка'
     & (Join-Path $root 'build.ps1') | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Сборка не удалась' }
-    Copy-Item (Join-Path $root 'build\1C-License-Inspector.exe') (Join-Path $root 'dist\1C-License-Inspector.exe') -Force
 if (Test-Path (Join-Path $root 'build\Mmc20Dump.exe')) { Copy-Item (Join-Path $root 'build\Mmc20Dump.exe') (Join-Path $root 'dist\Mmc20Dump.exe') -Force }
 }
 

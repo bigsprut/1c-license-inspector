@@ -46,7 +46,8 @@ try {
     Get-Process '1C-License-Inspector' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 600
 
-    $exeRel = 'build\1C-License-Inspector.exe'
+    if (-not (Test-Path 'dist')) { New-Item -ItemType Directory -Path 'dist' -Force | Out-Null }
+    $exeRel = 'dist\1C-License-Inspector.exe'
     if (Test-Path $exeRel) { Remove-Item $exeRel -Force }
 
     # 32-битный помощник (встраивается в приложение ресурсом)
@@ -87,7 +88,6 @@ try {
     $info = Get-Item $exeRel
     $ver = $info.VersionInfo.FileVersion
     Write-Host ('Готово: ' + $info.FullName + '  (' + [Math]::Round($info.Length / 1KB) + ' КБ, версия ' + $ver + ')')
-    Write-Host ('Копия:  ' + (Join-Path $root 'dist\1C-License-Inspector.exe'))
 }
 finally {
     Pop-Location

@@ -118,7 +118,7 @@ powershell -ExecutionPolicy Bypass -File .\Collect-LicenseData.ps1
 .\build.ps1
 ```
 
-Результат: `build\1C-License-Inspector.exe`. Иконка генерируется скриптом
+Результат: `dist\1C-License-Inspector.exe` (единственная копия — она же файл релиза). Иконка генерируется скриптом
 `tools\make-icon.ps1`, манифест — `res\app.manifest`.
 
 Каждый тег `v*` автоматически собирается в GitHub Actions и прикрепляется к релизу.
