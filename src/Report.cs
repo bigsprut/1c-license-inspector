@@ -23,7 +23,9 @@ namespace OneCLicenseInspector
             foreach (LicenseFileInfo lf in r.LicenseFiles)
             {
                 b.AppendLine("  " + lf.FileName + " | рег. " + lf.Pin + " | " + lf.Product + " | тип " + lf.LicenseType +
-                             " | мест " + lf.UsersNum + " | " + lf.Expires + " | " + lf.BoundTo);
+                             " | мест " + lf.UsersNum +
+                             " | использовано " + (lf.UsedBySessions < 0 ? "—" : lf.UsedBySessions.ToString()) +
+                             " | " + lf.Expires + " | " + lf.BoundTo);
             }
             b.AppendLine();
 

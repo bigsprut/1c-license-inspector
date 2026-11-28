@@ -28,13 +28,16 @@ namespace OneCLicenseInspector.Ui
             AddSpacer(6);
 
             _grid = MakeGrid();
-            _grid.Columns.Add(Col("Файл", "FileName", 150));
+            _grid.Columns.Add(Col("Файл", "FileName", 140));
             _grid.Columns.Add(Col("Рег. номер", "Pin", 120));
-            _grid.Columns.Add(Col("Продукт", "Product", 250));
+            _grid.Columns.Add(Col("Продукт", "Product", 205));
             _grid.Columns.Add(Col("Тип", "LicenseType", 90));
             _grid.Columns.Add(Col("Польз.", "Users", 60));
+            DataGridViewColumn usedCol = Col("Использ.", "Used", 80);
+            usedCol.ToolTipText = "Сколько сеансов держат эту лицензию прямо сейчас. У спящих сеансов лицензия освобождена и здесь не считается.";
+            _grid.Columns.Add(usedCol);
             _grid.Columns.Add(Col("Срок", "Expires", 110));
-            _grid.Columns.Add(Col("Каталог", "Directory", 220));
+            _grid.Columns.Add(Col("Каталог", "Directory", 190));
             _grid.SelectionChanged += delegate { ShowDetails(); };
             _fileSection = WithTitle("Файлы лицензий", Card(_grid, new Padding(1)));
             _gridRow = AddRow(_fileSection, 176);
@@ -131,6 +134,12 @@ namespace OneCLicenseInspector.Ui
                     }
                 }
             }
+            int usedTotal = 0; bool anyUsage = false;
+            foreach (LicenseFileInfo lf in r.LicenseFiles)
+            {
+                if (lf.UsedBySessions >= 0) { usedTotal += lf.UsedBySessions; anyUsage = true; }
+            }
+            if (anyUsage) usedClient = usedTotal;
             string clientUsage = usedClient < 0
                 ? "нет данных (кластер недоступен)"
                 : (clientTotal <= 0
@@ -184,6 +193,18 @@ namespace OneCLicenseInspector.Ui
                     "Утилита входит в комплект «1C:Enterprise License Tools» и требует Java.";
             }
 
+            // Какие лицензии захвачены сеансами: серия лицензии из `rac` (например «123456789»)
+            // сопоставляется с рег. номером файла («123456789O0»).
+            List<string> usedSeries = new List<string>();
+            if (r.Cluster != null)
+            {
+                foreach (SessionEntry se in r.Cluster.Sessions)
+                {
+                    string digits = Digits(se.LicenseSeries);
+                    if (digits.Length >= 6) usedSeries.Add(digits);
+                }
+            }
+
             List<FileRow> rows = new List<FileRow>();
             foreach (LicenseFileInfo f in r.LicenseFiles)
             {
@@ -193,6 +214,7 @@ namespace OneCLicenseInspector.Ui
                 row.Product = string.IsNullOrEmpty(f.Product) ? "—" : f.Product;
                 row.LicenseType = string.IsNullOrEmpty(f.LicenseType) ? "—" : f.LicenseType;
                 row.Users = string.IsNullOrEmpty(f.Users) ? "—" : f.Users;
+                row.Used = f.UsedBySessions < 0 ? "—" : f.UsedBySessions.ToString();
                 row.Expires = string.IsNullOrEmpty(f.Expires) ? "—" : f.Expires;
                 row.Activated = string.IsNullOrEmpty(f.Activated) ? "—" : f.Activated;
                 row.SizeText = Fmt.Bytes(f.Size);
@@ -217,6 +239,40 @@ namespace OneCLicenseInspector.Ui
             SetRowHeight(_ringRow, 30 + Math.Max(64, Math.Min(220, ringLines * 14 + 26)));
         }
 
+        /// <summary>Только цифры: «123456789O0» → «1234567890».</summary>
+        private static string Digits(string v)
+        {
+            if (string.IsNullOrEmpty(v)) return "";
+            StringBuilder b = new StringBuilder(v.Length);
+            foreach (char c in v)
+            {
+                if (c >= '0' && c <= '9') b.Append(c);
+            }
+            return b.ToString();
+        }
+
+        private static bool PinMatches(string sessionDigits, string fileDigits)
+        {
+            if (sessionDigits.Length < 6 || fileDigits.Length < 6) return false;
+            if (sessionDigits == fileDigits) return true;
+            if (fileDigits.StartsWith(sessionDigits, StringComparison.Ordinal)) return true;
+            if (sessionDigits.StartsWith(fileDigits, StringComparison.Ordinal)) return true;
+            return false;
+        }
+
+        /// <summary>Сколько сеансов держат лицензию, или «—», если кластер не опрошен.</summary>
+        private static string UsageText(string filePin, List<string> usedSeries, bool clusterKnown)
+        {
+            string pin = Digits(filePin);
+            if (pin.Length < 6) return clusterKnown ? "" : "—";
+            int used = 0;
+            foreach (string s in usedSeries)
+            {
+                if (PinMatches(s, pin)) used++;
+            }
+            if (used > 0) return used.ToString();
+            return clusterKnown ? "0" : "—";
+        }
         /// <summary>Сменить заголовок секции, не пересобирая её (нужно для пустых состояний).</summary>
         private static void SetSectionTitle(Panel section, string text)
         {
@@ -291,6 +347,7 @@ namespace OneCLicenseInspector.Ui
             public string Product { get; set; }
             public string LicenseType { get; set; }
             public string Users { get; set; }
+            public string Used { get; set; }
             public string Expires { get; set; }
             public string Activated { get; set; }
             public string SizeText { get; set; }

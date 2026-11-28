@@ -78,6 +78,8 @@ namespace OneCLicenseInspector
         public string LicenseType = "";
         public string Users = "";
         public int UsersNum;
+        /// <summary>Сколько сеансов держат эту лицензию сейчас (-1 — кластер не опрошен).</summary>
+        public int UsedBySessions = -1;
         public string Expires = "";
         public string BoundTo = "";
     }

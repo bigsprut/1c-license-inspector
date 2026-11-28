@@ -300,6 +300,56 @@ namespace OneCLicenseInspector
             return ReadLicenseFile(path);
         }
 
+        /// <summary>
+        /// Сопоставляет файлы лицензий с сеансами: серия лицензии из `rac` (например «123456789»)
+        /// сравнивается с рег. номером файла («123456789O0»). Заполняет UsedBySessions.
+        /// Вызывать после сбора сеансов (Scanner делает это в конце).
+        /// </summary>
+        public static void MatchUsage(ScanResult r)
+        {
+            if (r == null || r.Cluster == null) return;
+            bool known = r.Cluster.Available;
+            List<string> used = new List<string>();
+            foreach (SessionEntry se in r.Cluster.Sessions)
+            {
+                string digits = Digits(se.LicenseSeries);
+                if (digits.Length >= 6) used.Add(digits);
+            }
+            foreach (LicenseFileInfo f in r.LicenseFiles)
+            {
+                if (!known) { f.UsedBySessions = -1; continue; }
+                string pin = Digits(f.Pin);
+                if (pin.Length < 6) { f.UsedBySessions = -1; continue; }
+                int count = 0;
+                foreach (string s in used)
+                {
+                    if (PinMatches(s, pin)) count++;
+                }
+                f.UsedBySessions = count;
+            }
+        }
+
+        /// <summary>Только цифры: «123456789O0» → «1234567890».</summary>
+        internal static string Digits(string v)
+        {
+            if (string.IsNullOrEmpty(v)) return "";
+            StringBuilder b = new StringBuilder(v.Length);
+            foreach (char c in v)
+            {
+                if (c >= '0' && c <= '9') b.Append(c);
+            }
+            return b.ToString();
+        }
+
+        private static bool PinMatches(string sessionDigits, string fileDigits)
+        {
+            if (sessionDigits.Length < 6 || fileDigits.Length < 6) return false;
+            if (sessionDigits == fileDigits) return true;
+            if (fileDigits.StartsWith(sessionDigits, StringComparison.Ordinal)) return true;
+            if (sessionDigits.StartsWith(fileDigits, StringComparison.Ordinal)) return true;
+            return false;
+        }
+
         private static LicenseFileInfo ReadLicenseFile(string path)
         {
             try
