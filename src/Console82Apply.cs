@@ -76,6 +76,7 @@ namespace OneCLicenseInspector
                 se.AppId = pr.App;
                 se.StartedAt = pr.Started;
                 se.LicenseShort = pr.License;
+                    se.LastActivity = pr.LastActivity;
                 se.Infobase = pr.Infobase;
                 r.Cluster.Sessions.Add(se);
             }

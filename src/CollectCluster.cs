@@ -363,6 +363,7 @@ namespace OneCLicenseInspector
                         ? baseName : s.InfobaseId;
                     s.StartedAt = rec.Get("started-at");
                     s.Hibernate = rec.Get("hibernate");
+                    s.LastActivity = rec.Get("last-active-at");
                     ApplyLicense(s, rec);
                     c.Sessions.Add(s);
                 }

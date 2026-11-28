@@ -323,6 +323,8 @@ namespace OneCLicenseInspector.Ui
         {
             _nav.Resize += delegate { LayoutNav(); };
 
+            // Первая страница — лицензии и их использование сеансами: открывается при запуске.
+            RegisterPage("Лицензии и сеансы", "usage", delegate { return new LicenseUsagePage(); });
             RegisterPage("Обзор", "overview", delegate { return new OverviewPage(); });
             RegisterPage("Платформы 1С", "platform", delegate { return new PlatformsPage(); });
             RegisterPage("Аппаратные ключи", "key", delegate { return new HardwarePage(); });

@@ -85,6 +85,7 @@
 | `src/AutoDrop.cs` | выгрузка отчёта на `\\tsclient\…\drop` |
 | `src/ClusterCredentials.cs` | логин/пароль кластера, DPAPI (`pwd`, не `password` — скан секретов!) |
 | `src/Report.cs` | HTML/CSV + `BuildDigest` (дайджест с сырым rac и логом) |
+| `src/Ui/Pages/LicenseUsagePage.cs` | новая ПЕРВАЯ страница «Лицензии и сеансы»: две таблицы — лицензии (рег. номер, мест, занято, свободно) и использование сеансами (пользователь, компьютер, база, №, начало, активность, приложение, состояние, лицензия, места). Открывается при запуске; источники — файлы `*.lic` и MMC-консоль 8.2 |
 | `src/Ui/Pages/UsagePage.cs` | вкладка «Использование», поля прав, «Диагностика», журнал с фильтром |
 | `src/Console82Import.cs` | разбор TSV 8.2, `ParseLicenseFull` (тип/места/файл) |
 | `tools/Diag82Tree.cs` | обход всего дерева MMC (`diag82-tree.txt`) || `docs/UI-AUDIT.md` | аудит дизайна и UI: дефекты, правки 1.5.33, что осталось || `src/Ui/Theme.cs`, `src/Ui/PageBase.cs` | палитра и типографика, общие помощники таблиц (`FitGridHeight`, `HideEmptyColumns`) |
