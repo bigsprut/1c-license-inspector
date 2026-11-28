@@ -34,7 +34,7 @@ namespace OneCLicenseInspector.Ui
             _grid.Columns.Add(Col("Тип", "LicenseType", 90));
             _grid.Columns.Add(Col("Польз.", "Users", 60));
             DataGridViewColumn usedCol = Col("Использ.", "Used", 80);
-            usedCol.ToolTipText = "Сколько сеансов держат эту лицензию прямо сейчас. У спящих сеансов лицензия освобождена и здесь не считается.";
+            usedCol.ToolTipText = "Клиентские лицензии: сколько активных сеансов держат эту лицензию (у спящих лицензия освобождена).\r\nСерверная лицензия: занята работающим сервером 1С (rphost/rmngr), а не сеансами.";
             _grid.Columns.Add(usedCol);
             _grid.Columns.Add(Col("Срок", "Expires", 110));
             _grid.Columns.Add(Col("Каталог", "Directory", 190));
@@ -158,7 +158,7 @@ namespace OneCLicenseInspector.Ui
             info.Add(new KeyValuePair<string, string>("Лицензий всего",
                 r.LicenseFiles.Count + " · клиентских мест: " + clientTotal + " · серверных: " + serverTotal + (otherTotal > 0 ? " · прочих: " + otherTotal : "") + " · пользователей: " + usersSum));
             info.Add(new KeyValuePair<string, string>("Занято / свободно", clientUsage));
-            info.Add(new KeyValuePair<string, string>("Серверная лицензия", (serverTotal > 0 ? "есть (" + serverTotal + ")" : "не найдена") + (serverRunning ? " · сервер 1С запущен" : " · сервер 1С не запущен")));
+            info.Add(new KeyValuePair<string, string>("Серверная лицензия", (serverTotal > 0 ? "есть (" + serverTotal + ")" : "не найдена") + (serverRunning ? " · занята работающим сервером (rphost/rmngr)" : " · сервер 1С не запущен, лицензия свободна")));
             info.Add(new KeyValuePair<string, string>("Места в аппаратных ключах", seats));
             info.Add(new KeyValuePair<string, string>("Каталоги поиска",
                 r.LicenseStorages.Count == 0 ? "стандартные каталоги отсутствуют" : Fmt.ShortList(r.LicenseStorages, 3)));
@@ -214,7 +214,15 @@ namespace OneCLicenseInspector.Ui
                 row.Product = string.IsNullOrEmpty(f.Product) ? "—" : f.Product;
                 row.LicenseType = string.IsNullOrEmpty(f.LicenseType) ? "—" : f.LicenseType;
                 row.Users = string.IsNullOrEmpty(f.Users) ? "—" : f.Users;
-                row.Used = f.UsedBySessions < 0 ? "—" : f.UsedBySessions.ToString();
+                if (f.IsServerLicense)
+                {
+                    // Серверная лицензия занята работающим сервером, а не сеансами.
+                    row.Used = f.UsedByServer == 1 ? "сервером" : (f.UsedByServer == 0 ? "—" : "?");
+                }
+                else
+                {
+                    row.Used = f.UsedBySessions < 0 ? "—" : f.UsedBySessions.ToString();
+                }
                 row.Expires = string.IsNullOrEmpty(f.Expires) ? "—" : f.Expires;
                 row.Activated = string.IsNullOrEmpty(f.Activated) ? "—" : f.Activated;
                 row.SizeText = Fmt.Bytes(f.Size);

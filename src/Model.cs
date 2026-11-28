@@ -80,6 +80,10 @@ namespace OneCLicenseInspector
         public int UsersNum;
         /// <summary>Сколько сеансов держат эту лицензию сейчас (-1 — кластер не опрошен).</summary>
         public int UsedBySessions = -1;
+        /// <summary>Серверная лицензия: её занимают процессы сервера, а не сеансы.</summary>
+        public bool IsServerLicense = false;
+        /// <summary>-1 — неизвестно, 1 — сервер 1С работает, 0 — нет.</summary>
+        public int UsedByServer = -1;
         public string Expires = "";
         public string BoundTo = "";
     }

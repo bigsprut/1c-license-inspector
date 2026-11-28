@@ -315,8 +315,25 @@ namespace OneCLicenseInspector
                 string digits = Digits(se.LicenseSeries);
                 if (digits.Length >= 6) used.Add(digits);
             }
+            // Серверную лицензию занимают процессы сервера (ragent/rphost/rmngr), а не сеансы:
+            // для неё считаем не сеансы, а «работает ли сервер».
+            bool serverRunning = false;
+            foreach (ProcessInfo pi in r.Processes)
+            {
+                string pn = (pi.Name ?? "").ToLowerInvariant();
+                if (pn == "rphost" || pn == "rmngr" || pn == "ragent") { serverRunning = true; break; }
+            }
+
             foreach (LicenseFileInfo f in r.LicenseFiles)
             {
+                string kindText = ((f.LicenseType ?? "") + " " + (f.Product ?? "")).ToLowerInvariant();
+                f.IsServerLicense = kindText.IndexOf("сервер") >= 0;
+                if (f.IsServerLicense)
+                {
+                    f.UsedBySessions = -1;
+                    f.UsedByServer = serverRunning ? 1 : 0;
+                    continue;
+                }
                 if (!known) { f.UsedBySessions = -1; continue; }
                 string pin = Digits(f.Pin);
                 if (pin.Length < 6) { f.UsedBySessions = -1; continue; }

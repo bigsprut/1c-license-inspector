@@ -24,7 +24,9 @@ namespace OneCLicenseInspector
             {
                 b.AppendLine("  " + lf.FileName + " | рег. " + lf.Pin + " | " + lf.Product + " | тип " + lf.LicenseType +
                              " | мест " + lf.UsersNum +
-                             " | использовано " + (lf.UsedBySessions < 0 ? "—" : lf.UsedBySessions.ToString()) +
+                             " | " + (lf.IsServerLicense
+                                 ? (lf.UsedByServer == 1 ? "занята сервером" : "свободна (сервер не запущен)")
+                                 : "использовано " + (lf.UsedBySessions < 0 ? "—" : lf.UsedBySessions.ToString())) +
                              " | " + lf.Expires + " | " + lf.BoundTo);
             }
             b.AppendLine();
