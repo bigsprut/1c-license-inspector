@@ -159,6 +159,18 @@
   `/rac:build\racstub.exe /clusteruser:Администратор /clusterpwd:<любой>` — эмулирует
   анонимный `cluster admin list` и вход только логином `rac_admin`.
 
+## Удалённый прогон на сервере (только RDP снаружи)
+
+Порты 55200/55210 — опубликованный RDP; WinRM/WMI недоступны. Обмен идёт через
+перенаправленную папку RDP: `\\tsclient\D\work\Learn\DSHarness\1CCommon`.
+
+1. На сервере в RDP-сеансе запустить `Обработчик-ALL.cmd` (2016) или `Обработчик-S200.cmd` (2003).
+   Окно закрыть — доступ выключен, в системе ничего не остаётся.
+2. Моя сторона: `.\tools\queue-send.ps1 -Command digest -Server all -TimeoutSec 180`
+   (или `-Server s200`). Команды: `noop`, `digest`, `navtest`, `racprobe`, `netstat`,
+   `services`, `copy-log`, `start-ras`.
+3. Признак жизни: `drop\worker-all.txt` / `drop\worker-s200.txt`, лог — `drop\worker-*.log`.
+
 ## Тестовые среды
 
 - **ALL** — Windows Server 2016, 8.3.27. Доступ только через `drop` (RDP-редирект), прямого нет.

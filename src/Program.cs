@@ -112,7 +112,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.5.47";
+        public const string Version = "1.5.48";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -372,7 +372,8 @@ namespace OneCLicenseInspector
                     File.AppendAllText(log, DateTime.Now.ToString("s") + " " + ex + Environment.NewLine, Encoding.UTF8);
                 }
                 catch { }
-                if (!Has(args, "/silent")) MessageBox.Show(ex.Message, "Инспектор лицензий 1С", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // /noerrorbox — для автотестов: не показывать окно ошибки (иначе прогон висит без человека).
+                if (!Has(args, "/silent") && !Has(args, "/noerrorbox")) MessageBox.Show(ex.Message, "Инспектор лицензий 1С", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return 1;
             }
         }
