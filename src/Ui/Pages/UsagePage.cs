@@ -26,10 +26,8 @@ namespace OneCLicenseInspector.Ui
         private TextBox _sessUser;
         private TextBox _sessPwd;
         private FlatButton _sessRefresh;
-        private FlatButton _sessImport;
-        private FlatButton _sessConsole;
-        private FlatButton _sessGrab;
-        private FlatButton _sessAuto;
+        private FlatButton _sess82;
+        private ToolTip _tip;
         private ScanResult _result;
         private List<SessionEntry> _sessionItems = new List<SessionEntry>();
 
@@ -94,31 +92,35 @@ namespace OneCLicenseInspector.Ui
 
             FlowLayoutPanel top = new FlowLayoutPanel();
             top.Dock = DockStyle.Top;
-            // Кнопок и полей больше, чем помещается в одну строку (сервер, логин, пароль,
-            // «Опросить», «Диагностика», три действия для 8.2) — переносим на вторую строку,
-            // иначе правые кнопки уходят за край окна и становятся недоступны.
-            top.Height = 84;
+            // Одна строка: поля доступа, главное действие и диагностика; действия для 8.2 —
+            // в отдельном меню, чтобы панель не расползалась на две строки.
+            top.Height = 46;
+            top.MinimumSize = new Size(0, 46);
             top.Padding = new Padding(6, 6, 6, 4);
             top.WrapContents = true;
+            // высота по содержимому: если кнопки не помещаются в строку, панель растёт,
+            // а не обрезает правые элементы
+            top.AutoSize = true;
+            top.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             top.BackColor = Color.White;
 
             top.Controls.Add(LabelFor("Сервер"));
             _sessServer = new TextBox();
-            _sessServer.Width = 150;
+            _sessServer.Width = 130;
             _sessServer.Text = string.IsNullOrEmpty(Program.RasEndpoint) ? "localhost:1545" : Program.RasEndpoint;
             _sessServer.Margin = new Padding(4, 4, 12, 4);
             top.Controls.Add(_sessServer);
 
             top.Controls.Add(LabelFor("Логин"));
             _sessUser = new TextBox();
-            _sessUser.Width = 110;
+            _sessUser.Width = 100;
             _sessUser.Text = Program.ClusterUser;
             _sessUser.Margin = new Padding(4, 4, 12, 4);
             top.Controls.Add(_sessUser);
 
             top.Controls.Add(LabelFor("Пароль"));
             _sessPwd = new TextBox();
-            _sessPwd.Width = 110;
+            _sessPwd.Width = 100;
             _sessPwd.UseSystemPasswordChar = true;
             _sessPwd.Margin = new Padding(4, 4, 12, 4);
             top.Controls.Add(_sessPwd);
@@ -127,7 +129,7 @@ namespace OneCLicenseInspector.Ui
             _sessRefresh.Text = "Опросить";
             _sessRefresh.Icon = "refresh";
             _sessRefresh.Kind = ButtonKind.Primary;
-            _sessRefresh.Size = new Size(132, 30);
+            _sessRefresh.Size = new Size(120, 30);
             _sessRefresh.Margin = new Padding(2, 2, 4, 2);
             _sessRefresh.Click += delegate { RefreshCluster(); };
 
@@ -135,7 +137,7 @@ namespace OneCLicenseInspector.Ui
             diagBtn.Text = "Диагностика";
             diagBtn.Icon = "file";
             diagBtn.Kind = ButtonKind.Link;
-            diagBtn.Size = new Size(130, 30);
+            diagBtn.Size = new Size(124, 30);
             diagBtn.Margin = new Padding(2, 2, 4, 2);
             diagBtn.Click += delegate { ShowDiagnostics(); };
             top.Controls.Add(diagBtn);
@@ -155,41 +157,39 @@ namespace OneCLicenseInspector.Ui
             _sessPwd.TextChanged += delegate { Program.ClusterPwd = _sessPwd.Text; };
             top.Controls.Add(_sessRefresh);
 
-            _sessImport = new FlatButton();
-            _sessImport.Text = "Из консоли 8.2";
-            _sessImport.Icon = "file";
-            _sessImport.Kind = ButtonKind.Secondary;
-            _sessImport.Size = new Size(160, 30);
-            _sessImport.Margin = new Padding(2, 2, 4, 2);
-            _sessImport.Click += delegate { ImportConsole82(); };
-            top.Controls.Add(_sessImport);
+            // Подсказки: без них непонятно, что делают поля и кнопки.
+            _tip = new ToolTip();
+            _tip.AutoPopDelay = 15000;
+            _tip.InitialDelay = 400;
+            _tip.ReshowDelay = 100;
+            _tip.SetToolTip(_sessServer, "Адрес сервера администрирования (ras). По умолчанию localhost:1545 —\r\n" +
+                                         "это порт ras, а не кластера (1541).");
+            _tip.SetToolTip(_sessUser, "Логин администратора кластера. Нужен только если в кластере назначены\r\n" +
+                                       "администраторы; если их нет — оставьте поле пустым.");
+            _tip.SetToolTip(_sessPwd, "Пароль администратора кластера. Хранится зашифрованным (DPAPI)\r\n" +
+                                      "и в отчёт не попадает.");
+            _tip.SetToolTip(_sessRefresh, "Прочитать сеансы и выданные лицензии с кластера (F5 — полное обновление).");
+            _tip.SetToolTip(diagBtn, "Показать сырые ответы rac и подробный отчёт для разбора проблем.");
 
-            _sessConsole = new FlatButton();
-            _sessConsole.Text = "Открыть консоль";
-            _sessConsole.Icon = "key";
-            _sessConsole.Kind = ButtonKind.Link;
-            _sessConsole.Size = new Size(150, 30);
-            _sessConsole.Margin = new Padding(2, 2, 4, 2);
-            _sessConsole.Click += delegate { OpenConsole82(); };
-            top.Controls.Add(_sessConsole);
-
-            _sessGrab = new FlatButton();
-            _sessGrab.Text = "Взять из консоли";
-            _sessGrab.Icon = "refresh";
-            _sessGrab.Kind = ButtonKind.Primary;
-            _sessGrab.Size = new Size(170, 30);
-            _sessGrab.Margin = new Padding(2, 2, 4, 2);
-            _sessGrab.Click += delegate { GrabFromConsole(); };
-            top.Controls.Add(_sessGrab);
-
-            _sessAuto = new FlatButton();
-            _sessAuto.Text = "Собрать авто";
-            _sessAuto.Icon = "refresh";
-            _sessAuto.Kind = ButtonKind.Primary;
-            _sessAuto.Size = new Size(150, 30);
-            _sessAuto.Margin = new Padding(2, 2, 4, 2);
-            _sessAuto.Click += delegate { AutoCollect82(); };
-            top.Controls.Add(_sessAuto);
+            // Действия для сервера 8.2 спрятаны в одно меню: четыре отдельные кнопки
+            // на панели были неочевидны и отнимали место у главного действия.
+            _sess82 = new FlatButton();
+            _sess82.Text = "Сервер 8.2";
+            _sess82.Icon = "file";
+            _sess82.Kind = ButtonKind.Secondary;
+            _sess82.Size = new Size(124, 30);
+            _sess82.Margin = new Padding(2, 2, 4, 2);
+            ContextMenuStrip menu82 = new ContextMenuStrip();
+            menu82.Items.Add("Взять сеансы из открытой консоли 8.2", null, delegate { GrabFromConsole(); });
+            menu82.Items.Add("Собрать автоматически (MMC 2.0)", null, delegate { AutoCollect82(); });
+            menu82.Items.Add("Загрузить таблицу из файла или буфера", null, delegate { ImportConsole82(); });
+            menu82.Items.Add(new ToolStripSeparator());
+            menu82.Items.Add("Открыть консоль администрирования 8.2", null, delegate { OpenConsole82(); });
+            _sess82.Click += delegate { menu82.Show(_sess82, new Point(0, _sess82.Height)); };
+            _sess82.Visible = false; // покажем, если на машине действительно есть 8.2
+            top.Controls.Add(_sess82);
+            _tip.SetToolTip(_sess82, "Действия для сервера 1С 8.2: забрать сеансы из консоли администрирования,\r\n" +
+                                     "собрать их автоматически (MMC 2.0) или открыть консоль.");
 
             _sessHint = new Label();
             _sessHint.Dock = DockStyle.Bottom;
@@ -270,6 +270,22 @@ namespace OneCLicenseInspector.Ui
             return _sessPanel;
         }
 
+
+        /// <summary>Есть ли на машине признаки 1С 8.2 (платформа или сеансы, взятые из консоли).</summary>
+        private bool Has82Platforms(ScanResult r)
+        {
+            try
+            {
+                if (r == null) return false;
+                foreach (PlatformInfo p in r.Platforms)
+                {
+                    if (!string.IsNullOrEmpty(p.Version) && p.Version.StartsWith("8.2", StringComparison.Ordinal)) return true;
+                }
+                if (r.Cluster != null && r.Cluster.Processes.Count > 0) return true; // импорт из консоли 8.2
+            }
+            catch { }
+            return false;
+        }
         private static Label LabelFor(string text)
         {
             Label l = new Label();
@@ -312,6 +328,7 @@ namespace OneCLicenseInspector.Ui
         public override void Bind(ScanResult r)
         {
             _result = r;
+            if (_sess82 != null) _sess82.Visible = Has82Platforms(r);
 
             List<ProcRow> procs = new List<ProcRow>();
             foreach (ProcessInfo p in r.Processes)
@@ -403,7 +420,7 @@ namespace OneCLicenseInspector.Ui
                 string clip = Console82Automation.CopyTable(out err);
                 if (!string.IsNullOrEmpty(clip) && Console82Apply.TryApply(_result, clip, out s1))
                 {
-                    BindSessions();
+            BindSessions();
                     _sessHint.Text = "Взято из консоли 8.2: " + s1;
                     return;
                 }
@@ -827,7 +844,7 @@ namespace OneCLicenseInspector.Ui
                     BeginInvoke(new Action(delegate
                     {
                         _sessRefresh.Enabled = true;
-                        BindSessions();
+            BindSessions();
                     }));
                 }
                 catch { }

@@ -42,6 +42,14 @@ namespace OneCLicenseInspector.Ui
             Controls.Add(RefreshButton);
             Controls.Add(Export);
             Controls.Add(Copy);
+
+            // Подсказки к кнопкам шапки: «Копировать» и «Отчёт» без них легко перепутать.
+            _copyTip = new ToolTip();
+            _copyTip.AutoPopDelay = 15000;
+            _copyTip.InitialDelay = 400;
+            _copyTip.SetToolTip(RefreshButton, "Заново собрать все сведения о лицензиях на этом компьютере (F5).");
+            _copyTip.SetToolTip(Copy, "Скопировать сводку текущей страницы в буфер обмена — удобно вставить в письмо или чат.");
+            _copyTip.SetToolTip(Export, "Сохранить полный HTML-отчёт в файл.");
         }
 
         public void SetBusy(bool busy)

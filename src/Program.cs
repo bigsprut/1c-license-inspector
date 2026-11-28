@@ -111,7 +111,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.5.35";
+        public const string Version = "1.5.36";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
