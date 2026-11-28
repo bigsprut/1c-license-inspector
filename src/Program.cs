@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -145,7 +146,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.7.0";
+        public const string Version = "1.7.1";
 
         // Авторство — в одном месте: показывается в статусной строке, в «О программе»,
         // в HTML-отчёте и в дайджесте (28.11.2026 просил Сергей: PrS, bigsprut@mail.ru).
@@ -540,15 +541,137 @@ namespace OneCLicenseInspector
             r.System.Manufacturer = "";
             r.MachineInfo = "COMPUTER · Windows Server · x64";
 
+            // С 1.7.1 чистим не только System.*: имя машины, домен, пользователь и адреса
+            // приходят ещё из службы Sentinel LDK, HASP и сеансов кластера. Скриншоты уходят
+            // в публичный репозиторий, а «deskower · Windows 10 Enterprise» на картинке —
+            // та же утечка, что и PIN в тексте.
+            if (r.Sentinel != null)
+            {
+                r.Sentinel.ServerName = ScrubText(r.Sentinel.ServerName, pc, os, user, domain);
+                r.Sentinel.ServerOs = "Windows Server";
+                r.Sentinel.Addresses = "";
+                r.Sentinel.DriverSummary = ScrubText(r.Sentinel.DriverSummary, pc, os, user, domain);
+                r.Sentinel.Status = ScrubText(r.Sentinel.Status, pc, os, user, domain);
+                r.Sentinel.Error = ScrubText(r.Sentinel.Error, pc, os, user, domain);
+            }
+            if (r.Hasp4 != null)
+            {
+                r.Hasp4.ServicePath = ScrubText(r.Hasp4.ServicePath, pc, os, user, domain);
+                r.Hasp4.IniSummary = ScrubText(r.Hasp4.IniSummary, pc, os, user, domain);
+                r.Hasp4.LogPath = ScrubText(r.Hasp4.LogPath, pc, os, user, domain);
+                r.Hasp4.AddressFile = ScrubText(r.Hasp4.AddressFile, pc, os, user, domain);
+                r.Hasp4.NethaspIni = ScrubText(r.Hasp4.NethaspIni, pc, os, user, domain);
+                r.Hasp4.Comment = ScrubText(r.Hasp4.Comment, pc, os, user, domain);
+                r.Hasp4.ToolPath = ScrubText(r.Hasp4.ToolPath, pc, os, user, domain);
+                r.Hasp4.ToolOutput = MaskLongDigits(ScrubText(r.Hasp4.ToolOutput, pc, os, user, domain));
+                r.Hasp4.ReportedKeyId = MaskLongDigits(r.Hasp4.ReportedKeyId);
+            }
+            if (r.Platforms != null)
+            {
+                foreach (PlatformInfo p in r.Platforms)
+                {
+                    p.Path = ScrubText(p.Path, pc, os, user, domain);
+                    p.BinPath = ScrubText(p.BinPath, pc, os, user, domain);
+                }
+            }
+            if (r.LicenseFiles != null)
+            {
+                foreach (LicenseFileInfo lf in r.LicenseFiles)
+                {
+                    lf.FullPath = ScrubText(lf.FullPath, pc, os, user, domain);
+                    lf.Directory = ScrubText(lf.Directory, pc, os, user, domain);
+                    lf.BoundTo = "DEMO-PC";
+                    lf.Note = ScrubText(lf.Note, pc, os, user, domain);
+                    lf.Preview = MaskLongDigits(ScrubText(lf.Preview, pc, os, user, domain));
+                }
+            }
+            if (r.Cluster != null)
+            {
+                r.Cluster.Endpoint = ScrubText(r.Cluster.Endpoint, pc, os, user, domain);
+                ScrubSessions(r.Cluster.Sessions, pc, os, user, domain, true);
+                // У процессов в поле User лежит имя сервера (rphost), а не человек, —
+                // имена пользователей там маскировать нельзя, иначе в таблице
+                // «Рабочие процессы» вместо компьютера окажется «Пользователь».
+                ScrubSessions(r.Cluster.Processes, pc, os, user, domain, false);
+                foreach (SessionEntry p in r.Cluster.Processes) p.User = "SRV";
+            }
+            if (r.Processes != null)
+            {
+                foreach (ProcessInfo p in r.Processes) p.Path = ScrubText(p.Path, pc, os, user, domain);
+            }
+            if (r.Services != null)
+            {
+                foreach (ServiceInfo s in r.Services) s.Path = ScrubText(s.Path, pc, os, user, domain);
+            }
+
             foreach (LogEntry e in r.Log)
             {
                 if (string.IsNullOrEmpty(e.Text)) continue;
-                if (!string.IsNullOrEmpty(pc)) e.Text = e.Text.Replace(pc, "COMPUTER");
-                if (!string.IsNullOrEmpty(os)) e.Text = e.Text.Replace(os, "Windows Server");
-                if (!string.IsNullOrEmpty(user)) e.Text = e.Text.Replace(user, "user");
-                if (!string.IsNullOrEmpty(domain)) e.Text = e.Text.Replace(domain, "WORKGROUP");
+                e.Text = ScrubText(e.Text, pc, os, user, domain);
             }
         }
+
+        private static void ScrubSessions(List<SessionEntry> list, string pc, string os, string user, string domain,
+            bool maskUsers)
+        {
+            if (list == null) return;
+            foreach (SessionEntry s in list)
+            {
+                if (maskUsers)
+                {
+                    // Имена пользователей кластера — это живые люди, на картинке их быть не должно.
+                    // Демо-имена («Пользователь 1», технический «DefUser») оставляем как есть.
+                    if (!string.IsNullOrEmpty(s.User) &&
+                        !s.User.StartsWith("Пользователь", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(s.User, "DefUser", StringComparison.OrdinalIgnoreCase))
+                        s.User = "Пользователь";
+                    // Имена машин — тоже примета конкретной сети: демо-имена PC-N оставляем.
+                    if (!string.IsNullOrEmpty(s.Host) &&
+                        !s.Host.StartsWith("PC-", StringComparison.OrdinalIgnoreCase))
+                        s.Host = "PC";
+                }
+                else
+                {
+                    s.User = ScrubText(s.User, pc, os, user, domain);
+                }
+                s.ClientIp = ScrubText(s.ClientIp, pc, os, user, domain);
+                s.LicenseShort = ScrubText(s.LicenseShort, pc, os, user, domain);
+                s.LicenseFull = MaskLongDigits(ScrubText(s.LicenseFull, pc, os, user, domain));
+                s.LicenseFullName = ScrubText(s.LicenseFullName, pc, os, user, domain);
+                s.LicenseFile = ScrubText(s.LicenseFile, pc, os, user, domain);
+            }
+        }
+
+        /// <summary>Замена без учёта регистра; короткие строки (короче 3 символов) не трогаем.</summary>
+        private static string ScrubText(string s, string pc, string os, string user, string domain)
+        {
+            if (string.IsNullOrEmpty(s)) return s;
+            s = ReplaceLoose(s, pc, "COMPUTER");
+            s = ReplaceLoose(s, os, "Windows Server");
+            s = ReplaceLoose(s, user, "user");
+            s = ReplaceLoose(s, domain, "WORKGROUP");
+            // IP-адреса — в тестовый диапазон TEST-NET-1 (он для примеров и зарезервирован).
+            s = Regex.Replace(s, @"\b\d{1,3}(\.\d{1,3}){3}\b", "192.0.2.34");
+            return s;
+        }
+
+        private static string ReplaceLoose(string s, string from, string to)
+        {
+            if (string.IsNullOrEmpty(s) || string.IsNullOrEmpty(from) || from.Length < 3) return s;
+            if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase)) return s;
+            return Regex.Replace(s, Regex.Escape(from), to, RegexOptions.IgnoreCase);
+        }
+
+        /// <summary>
+        /// Длинные числа (8+ цифр) — это рег. номера, PIN и HASP ID; на картинке их быть не должно.
+        /// Версии и даты под правило не попадают: там точки и дефисы.
+        /// </summary>
+        private static string MaskLongDigits(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return s;
+            return Regex.Replace(s, @"\b\d{8,}\b", "**********");
+        }
+
         private static void DumpControls(System.Windows.Forms.Control c, string path, int depth)
         {
             try

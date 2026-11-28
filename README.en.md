@@ -40,6 +40,10 @@ Latest release: [Releases page](https://github.com/bigsprut/1c-license-inspector
 Ready to run, no installer: [`dist/1C-License-Inspector.exe`](dist/1C-License-Inspector.exe) (full)
 and [`dist/1C-License-Inspector-Lite.exe`](dist/1C-License-Inspector-Lite.exe) (quick build).
 
+**Nothing else has to be copied:** each exe is a single self-contained file for .NET Framework 4.0,
+with no installer and no extra libraries. `Mmc20Dump.exe` in the release is an optional standalone
+helper for a manual 1C 8.2 console dump — the applications do not need it.
+
 | System | Requirement |
 |---|---|
 | Windows Server 2003 x64 SP2 | .NET Framework 4.0 |
@@ -50,10 +54,12 @@ and [`dist/1C-License-Inspector-Lite.exe`](dist/1C-License-Inspector-Lite.exe) (
 Since 1.6.0 a second exe is built — **`1C-License-Inspector-Lite.exe`** with just two tabs,
 **Licenses** and **License usage**. It skips hardware keys (Sentinel/HASP), services and ports,
 so it starts noticeably faster; both programs share the same collectors, so the numbers match.
+It is a standalone application — the full version is not needed next to it.
 Launch it via `Запустить-кратко.cmd`.
 
 Both exes are built from the same sources and differ only in the entry point and the **icon**:
-amber for the full program, turquoise with a tab stripe for the quick one.
+since 1.7.1 both show a license sheet with «1C» and a magnifying glass (so the icon itself says
+"view 1C licenses"), amber for the full program and turquoise for the quick one.
 
 Screenshots: `docs/img/lite-licenses.png`, `docs/img/lite-usage.png`.
 
