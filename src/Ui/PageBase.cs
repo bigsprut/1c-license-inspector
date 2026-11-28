@@ -267,8 +267,37 @@ namespace OneCLicenseInspector.Ui
                     }
                     col.Visible = any;
                 }
+                // Скрытый столбец под текущей ячейкой — исключение «Текущую ячейку нельзя
+                // сделать невидимой». Уводим курсор на первый видимый столбец или снимаем.
+                try
+                {
+                    if (grid.CurrentCell != null && grid.CurrentCell.ColumnIndex >= 0 &&
+                        !grid.Columns[grid.CurrentCell.ColumnIndex].Visible)
+                    {
+                        int first = FirstVisibleColumnIndex(grid);
+                        if (first >= 0 && grid.CurrentCell.RowIndex < grid.Rows.Count)
+                            grid.CurrentCell = grid.Rows[grid.CurrentCell.RowIndex].Cells[first];
+                        else
+                            grid.CurrentCell = null;
+                    }
+                }
+                catch { }
             }
             catch { }
+        }
+
+        /// <summary>Индекс первого видимого столбца таблицы (-1, если видимых нет).</summary>
+        protected static int FirstVisibleColumnIndex(DataGridView grid)
+        {
+            try
+            {
+                for (int i = 0; i < grid.Columns.Count; i++)
+                {
+                    if (grid.Columns[i].Visible) return i;
+                }
+            }
+            catch { }
+            return -1;
         }
     }
 

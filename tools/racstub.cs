@@ -16,9 +16,27 @@ internal static class RacStub
 {
     private static void Write(string text)
     {
+        // RACSTUB_DROP=<имя поля> убирает строки поля из вывода — так проверяются пустые
+        // столбцы в таблицах (например, RACSTUB_DROP=infobase делает пустой первую колонку).
+        text = DropField(text);
         byte[] bytes = Encoding.GetEncoding(866).GetBytes(text.Replace("\n", "\r\n"));
         Console.OpenStandardOutput().Write(bytes, 0, bytes.Length);
         Console.OpenStandardOutput().Flush();
+    }
+
+    private static string DropField(string text)
+    {
+        string drop = Environment.GetEnvironmentVariable("RACSTUB_DROP");
+        if (string.IsNullOrEmpty(drop)) return text;
+        StringBuilder sb = new StringBuilder();
+        foreach (string line in text.Replace("\r\n", "\n").Split('\n'))
+        {
+            string trimmed = line.TrimStart();
+            if (trimmed.StartsWith(drop + " ", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith(drop + ":", StringComparison.OrdinalIgnoreCase)) continue;
+            sb.Append(line).Append('\n');
+        }
+        return sb.ToString();
     }
 
     private static void Fail(string text)

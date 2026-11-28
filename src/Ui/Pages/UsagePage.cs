@@ -604,8 +604,19 @@ namespace OneCLicenseInspector.Ui
 
             if (rows.Count > 0)
             {
-                _sessions.CurrentCell = _sessions.Rows[0].Cells[0];
-                _sessions.Rows[0].Selected = true;
+                // Столбец с индексом 0 мог быть скрыт как пустой (HideEmptyColumns), а WinForms
+                // запрещает делать текущей невидимую ячейку — ищем первый видимый столбец.
+                int ci = FirstVisibleColumnIndex(_sessions);
+                if (ci < 0) _sessions.ClearSelection();
+                else
+                {
+                    try
+                    {
+                        _sessions.CurrentCell = _sessions.Rows[0].Cells[ci];
+                        _sessions.Rows[0].Selected = true;
+                    }
+                    catch { _sessions.ClearSelection(); }
+                }
             }
             ShowSessionDetails();
         }
