@@ -6,12 +6,8 @@
 
 An unofficial Windows utility that audits **1C:Enterprise** licenses on a single machine:
 installed platforms, hardware protection keys, software licenses, active sessions
-and the licenses they hold.
+and the licenses they hold — plus who actually loads the cluster.
 
-There is also a **quick build** — `1C-License-Inspector-Lite.exe` (since 1.6.0) with just two
-tabs, **Licenses** and **License usage**. It skips hardware keys (Sentinel/HASP), services and
-ports, so it starts noticeably faster; both programs share the same collectors, so the numbers
-match. Screenshots: `docs/img/lite-licenses.png`, `docs/img/lite-usage.png`.
 One self-contained exe, no installation and no third-party libraries. Runs on
 **Windows Server 2003 x64** (with .NET Framework 4.0), **Windows Server 2016/2019/2022**
 and Windows 7/8/10/11.
@@ -22,28 +18,51 @@ and Windows 7/8/10/11.
 
 ## Features
 
-- **1C platforms** — every installed 8.0–8.3 and 7.7 build, bitness, delivery set, paths.
+- **1C platforms** — every installed 8.0–8.3 and 7.7 build, bitness, delivery set, components, paths.
 - **Sentinel LDK / HASP HL keys** — keys, features, login limits, used/free seats and sessions
   (read through the local license manager Admin API, port 1947).
 - **HASP4 Net** (1C 7.7 / 8.2) — service, version, port 475, configuration; `HASPInfo` output,
   `*.haspinfo` report import and a button to launch HASP Monitor.
-- **Software licenses** — `*.lic` files: location, activation date, format, SHA-1; output of
-  the 1C `ring` licensing utility when it is installed.
-- **Sessions and licenses** — who is connected, from which infobase, which license is held
-  and how many seats are used (via `rac` and the 1C 8.3 administration server).
+- **Software licenses** — `*.lic` files: location, activation date, size, format, SHA-1,
+  **expiry date**; output of the 1C `ring` utility when it is installed.
+- **Licenses and sessions** — what licenses exist (number, type, seats, used, free, expiry date,
+  issued by server) and who holds them: user, host, **client IP**, infobase, application, state,
+  **last activity**, **seats / used** — via `rac` and the 1C 8.3 administration server.
+- **Usage** — 1C and protection processes, services, network ports.
 - **Session load** (1.7.0) — who actually loads the cluster: total call duration, CPU time
   and database traffic per session, sorted from the heaviest one down (`rac` counters).
-- **Reports** — HTML and CSV, plus a silent mode for scheduled runs.
+- **Reports** — HTML (for printing and sharing) and CSV, plus a silent mode for scheduled runs.
 
 ## Download
 
-Latest release: [Releases page](https://github.com/bigsprut/1c-license-inspector/releases/latest) —
-`1C-License-Inspector.exe`, no installer.
+Latest release: [Releases page](https://github.com/bigsprut/1c-license-inspector/releases/latest).
+
+Ready to run, no installer: [`dist/1C-License-Inspector.exe`](dist/1C-License-Inspector.exe) (full)
+and [`dist/1C-License-Inspector-Lite.exe`](dist/1C-License-Inspector-Lite.exe) (quick build).
 
 | System | Requirement |
 |---|---|
 | Windows Server 2003 x64 SP2 | .NET Framework 4.0 |
 | Windows 7 / 8 / 10 / 11, Server 2008 R2–2022 | .NET Framework 4.x |
+
+## Quick build: licenses and their usage only
+
+Since 1.6.0 a second exe is built — **`1C-License-Inspector-Lite.exe`** with just two tabs,
+**Licenses** and **License usage**. It skips hardware keys (Sentinel/HASP), services and ports,
+so it starts noticeably faster; both programs share the same collectors, so the numbers match.
+Launch it via `Запустить-кратко.cmd`.
+
+Both exes are built from the same sources and differ only in the entry point and the **icon**:
+amber for the full program, turquoise with a tab stripe for the quick one.
+
+Screenshots: `docs/img/lite-licenses.png`, `docs/img/lite-usage.png`.
+
+## About box
+
+**F1** or a click on the **PrS <bigsprut@mail.ru>** signature in the status bar opens the **About**
+window: version, author, purpose and shortcuts. The same author is written into the exe metadata
+(*Properties → Details*: company `PrS`, copyright `© 2026 PrS <bigsprut@mail.ru>`), into the HTML
+report footer and into the first line of the digest.
 
 ## Quick start
 
@@ -103,11 +122,13 @@ or activate anything.
 
 - **Sentinel LDK / HASP HL** — fully readable through the local Admin API (port 1947).
 - **HASP4 Net** — service, version, port and settings; key contents only via HASP Monitor.
-- **Software licenses** — files and attributes; PIN, edition and seat count are shown by
-  the 1C `ring` utility or by 1C itself.
+- **Software licenses** — files and their attributes. 1C 8.3 `*.lic` files are readable: the
+  bottom of the file exposes the registration number, license type, expiry date and seat count.
+  8.2 files are **encrypted** — there PIN, edition and seat count come from the 1C `ring` utility
+  or from 1C itself.
 - **Sessions and licenses** — through the documented `rac` tool (1C 8.3).
-- **Free seats** are computed for Sentinel LDK keys; a `*.lic` file does not expose the
-  seat limit in clear text.
+- **Free seats** are computed for Sentinel LDK keys and from the seat count in 8.3 `*.lic` files;
+  encrypted 8.2 files do not expose the seat limit in clear text.
 
 ## Collecting data from a server
 
