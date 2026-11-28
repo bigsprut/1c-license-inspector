@@ -112,7 +112,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.5.48";
+        public const string Version = "1.5.49";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -251,6 +251,7 @@ namespace OneCLicenseInspector
                     }
                     catch { }
                     if (!silent) Console.WriteLine("Диагностика rac: " + probePath);
+                    System.Environment.Exit(0); // COM/HTTP-потоки не должны держать процесс живым
                     return 0;
                 }
 
@@ -258,6 +259,7 @@ namespace OneCLicenseInspector
                 {
                     ScanResult dr = Scanner.Run(null);
                     WriteText(digest, Report.BuildDigest(dr, Diag.Tail(60000)), true);
+                    System.Environment.Exit(0); // COM/HTTP-потоки не должны держать процесс живым
                     return 0;
                 }
 

@@ -60,6 +60,25 @@ function Run-Wait([string]$exe, [string]$args, [string]$outFile) {
     return $p.ExitCode
 }
 
+# Запуск приложения без ожидания выхода: COM/HTTP-потоки могут держать процесс,
+# поэтому ждём появления файла результата, а процесс потом гасим.
+function Start-App([string]$args) {
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $local
+    $psi.Arguments = $args
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    return [System.Diagnostics.Process]::Start($psi)
+}
+
+function Wait-Path([string]$path, [int]$seconds) {
+    $deadline = (Get-Date).AddSeconds($seconds)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Path $path) { return $true }
+        Start-Sleep -Milliseconds 500
+    }
+    return (Test-Path $path)
+}
 # Копия приложения локально: с 2003 exe из UNC-папки может не загрузиться,
 # а так всегда берётся свежая сборка.
 function Sync-App() {
@@ -118,10 +137,20 @@ while ($true) {
                 $err = Sync-App
                 if ($err -ne "") { [void]$body.Add($err) }
                 else {
-                    $out = Join-Path $drop ("digest-" + $Name + "-" + $id + ".txt")
-                    $rc = Run-Wait $local ("/digest:`"" + $out + "`" /silent") ""
-                    [void]$body.Add("rc=" + $rc + " · отчёт: " + $out)
-                    if (Test-Path $out) { [void]$body.Add("размер: " + (Get-Item $out).Length + " байт") }
+                    # Пишем отчёт в ЛОКАЛЬНЫЙ файл (UNC-запись из приложения иногда висит),
+                    # ждём появления и копируем в drop. Выход процесса не важен.
+                    $tmpOut = Join-Path $work ("digest-" + $id + ".txt")
+                    if (Test-Path $tmpOut) { Remove-Item $tmpOut -Force -ErrorAction SilentlyContinue }
+                    $proc = Start-App ("/digest:`"" + $tmpOut + "`" /silent")
+                    $ok = Wait-Path $tmpOut 240
+                    Start-Sleep -Seconds 1
+                    try { if (-not $proc.HasExited) { $proc.Kill() } } catch { }
+                    if ($ok) {
+                        $dst = Join-Path $drop ("digest-" + $Name + "-" + $id + ".txt")
+                        Copy-Item $tmpOut $dst -Force
+                        [void]$body.Add("готово: " + $dst + " (" + (Get-Item $dst).Length + " байт)")
+                    }
+                    else { [void]$body.Add("ФАЙЛ НЕ ПОЯВИЛСЯ за 240 с") }
                 }
             }
             "navtest" {
@@ -142,9 +171,18 @@ while ($true) {
                 $err = Sync-App
                 if ($err -ne "") { [void]$body.Add($err) }
                 else {
-                    $out = Join-Path $drop ("racprobe-" + $Name + "-" + $id + ".txt")
-                    $rc = Run-Wait $local ("/racprobe:`"" + $out + "`" /silent") ""
-                    [void]$body.Add("rc=" + $rc + " · отчёт: " + $out)
+                    $tmpOut = Join-Path $work ("racprobe-" + $id + ".txt")
+                    if (Test-Path $tmpOut) { Remove-Item $tmpOut -Force -ErrorAction SilentlyContinue }
+                    $proc = Start-App ("/racprobe:`"" + $tmpOut + "`" /silent")
+                    $ok = Wait-Path $tmpOut 180
+                    Start-Sleep -Seconds 1
+                    try { if (-not $proc.HasExited) { $proc.Kill() } } catch { }
+                    if ($ok) {
+                        $dst = Join-Path $drop ("racprobe-" + $Name + "-" + $id + ".txt")
+                        Copy-Item $tmpOut $dst -Force
+                        [void]$body.Add("готово: " + $dst + " (" + (Get-Item $dst).Length + " байт)")
+                    }
+                    else { [void]$body.Add("ФАЙЛ НЕ ПОЯВИЛСЯ за 180 с") }
                 }
             }
             "netstat" {
