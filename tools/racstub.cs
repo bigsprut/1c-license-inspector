@@ -28,12 +28,20 @@ internal static class RacStub
     {
         string drop = Environment.GetEnvironmentVariable("RACSTUB_DROP");
         if (string.IsNullOrEmpty(drop)) return text;
+        string[] names = drop.Split(',');
         StringBuilder sb = new StringBuilder();
         foreach (string line in text.Replace("\r\n", "\n").Split('\n'))
         {
             string trimmed = line.TrimStart();
-            if (trimmed.StartsWith(drop + " ", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.StartsWith(drop + ":", StringComparison.OrdinalIgnoreCase)) continue;
+            bool cut = false;
+            foreach (string raw in names)
+            {
+                string nm = raw.Trim();
+                if (nm.Length == 0) continue;
+                if (trimmed.StartsWith(nm + " ", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.StartsWith(nm + ":", StringComparison.OrdinalIgnoreCase)) { cut = true; break; }
+            }
+            if (cut) continue;
             sb.Append(line).Append('\n');
         }
         return sb.ToString();
@@ -59,7 +67,7 @@ internal static class RacStub
         "session        : aaaaaaaa-0000-0000-0000-000000000001\n" +
         "session-id     : 3\nuser-name      : Сергей\nhost           : WORKPC\n" +
         "app-id         : 1CV8C\ninfobase       : 11111111-1111-1111-1111-111111111111\n" +
-        "started-at     : 2026-11-27T18:40:12\n\n";
+        "started-at     : 2026-11-27T18:40:12\nhibernate      : yes\n\n";
 
     // Как на живом кластере 8.3.27: ответ с --licenses содержит только лицензионную часть,
     // без информационной базы и времени начала. Список без --licenses — полный.

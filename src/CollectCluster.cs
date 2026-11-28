@@ -362,6 +362,7 @@ namespace OneCLicenseInspector
                     s.Infobase = baseNames.TryGetValue(s.InfobaseId, out baseName) && baseName.Length > 0
                         ? baseName : s.InfobaseId;
                     s.StartedAt = rec.Get("started-at");
+                    s.Hibernate = rec.Get("hibernate");
                     ApplyLicense(s, rec);
                     c.Sessions.Add(s);
                 }

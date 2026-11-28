@@ -313,6 +313,7 @@ namespace OneCLicenseInspector
     {
         public string SessionId = "";
         public string SessionNum = "";
+        public string Hibernate = "";
         public string User = "";
         public string Host = "";
         public string AppId = "";

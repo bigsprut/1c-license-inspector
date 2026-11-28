@@ -242,7 +242,8 @@ namespace OneCLicenseInspector.Ui
             _sessions.Columns.Add(Col("Начало", "StartedAt", 118));
             _sessions.Columns.Add(Col("Компьютер", "Host", 110));
             _sessions.Columns.Add(Col("Пользователь", "User", 130));
-            _sessions.Columns.Add(Col("Приложение", "AppId", 96));
+            _sessions.Columns.Add(Col("Приложение", "AppId", 92));
+            _sessions.Columns.Add(Col("Состояние", "State", 78));
             _sessions.Columns.Add(Col("Лицензия", "License", 120));
             _sessions.Columns.Add(Col("Тип лиц.", "TypeCode", 65));
             _sessions.Columns.Add(Col("Рег. номер", "Pin", 110));
@@ -586,9 +587,13 @@ namespace OneCLicenseInspector.Ui
                 // 8.3 отдаёт лицензию структурными полями (тип, серия, места) — берём их,
                 // иначе строка «Сервер, 123456789 5 5» разбиралась бы 8.2-парсером неверно.
                 bool structured = !string.IsNullOrEmpty(s.LicenseSeries) || !string.IsNullOrEmpty(s.MaxUsersAll);
+                bool sleeping = string.Equals(s.Hibernate, "yes", StringComparison.OrdinalIgnoreCase);
+                row.State = sleeping ? "спит" : "активен";
+                // У спящего сеанса 1С освобождает клиентскую лицензию — это не ошибка чтения,
+                // поэтому вместо прочерка пишем причину.
                 row.License = structured
                     ? (string.IsNullOrEmpty(s.LicenseType) ? LicenseText(s) : s.LicenseType)
-                    : (licKind.Length > 0 ? licKind : LicenseText(s));
+                    : (licKind.Length > 0 ? licKind : (sleeping ? "не выдана (спит)" : LicenseText(s)));
                 row.Pin = structured ? s.LicenseSeries : licPin;
                 int seats; int.TryParse(structured ? s.MaxUsersAll : (licTotal >= 0 ? licTotal.ToString() : ""), out seats);
                 int busy; int.TryParse(structured ? s.MaxUsersCur : "", out busy);
@@ -630,7 +635,16 @@ namespace OneCLicenseInspector.Ui
             }
             else
             {
-                _sessHint.Text = "Процессов (серверные): " + c.Processes.Count + " · сеансов (клиентские): " + c.Sessions.Count + " · " + c.Endpoint;
+                string hint = "Процессов (серверные): " + c.Processes.Count + " · сеансов (клиентские): " + c.Sessions.Count + " · " + c.Endpoint;
+                int sleepingNoLic = 0;
+                foreach (SessionEntry se in c.Sessions)
+                {
+                    if (string.Equals(se.Hibernate, "yes", StringComparison.OrdinalIgnoreCase) &&
+                        string.IsNullOrEmpty(se.LicenseSeries) && string.IsNullOrEmpty(se.LicenseType)) sleepingNoLic++;
+                }
+                if (sleepingNoLic > 0)
+                    hint += " · лицензия не выдана у спящих сеансов: " + sleepingNoLic + " (1С освобождает её, пока пользователь не активен)";
+                _sessHint.Text = hint;
             }
 
             if (rows.Count > 0)
@@ -705,6 +719,9 @@ namespace OneCLicenseInspector.Ui
             lines.Add("База         : " + s.Infobase +
                       (!string.IsNullOrEmpty(s.InfobaseId) && s.InfobaseId != s.Infobase ? " (" + s.InfobaseId + ")" : ""));
             lines.Add("Начало       : " + s.StartedAt);
+            bool sleeping = string.Equals(s.Hibernate, "yes", StringComparison.OrdinalIgnoreCase);
+            if (!string.IsNullOrEmpty(s.Hibernate))
+                lines.Add("Состояние    : " + (sleeping ? "спящий — 1С освободила клиентскую лицензию" : "активный"));
             if (!string.IsNullOrEmpty(s.LicenseType)) lines.Add("Тип лицензии : " + s.LicenseType);
             if (!string.IsNullOrEmpty(s.LicenseSeries)) lines.Add("Серия        : " + s.LicenseSeries);
             if (!string.IsNullOrEmpty(s.LicenseFullName)) lines.Add("Продукт      : " + s.LicenseFullName);
@@ -887,6 +904,7 @@ namespace OneCLicenseInspector.Ui
             public string Host { get; set; }
             public string User { get; set; }
             public string AppId { get; set; }
+            public string State { get; set; }
             public string License { get; set; }
             public string TypeCode { get; set; }
             public string Pin { get; set; }
