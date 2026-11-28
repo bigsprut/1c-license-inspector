@@ -230,6 +230,12 @@ while ($true) {
             }
         }
 
+        # Свежий журнал приложения рядом с результатом: видно, на каком шаге что пошло не так.
+        try {
+            $src = Get-AppLogPath
+            if ($src -ne "") { Copy-Item $src (Join-Path $drop ("applog-" + $Name + ".log")) -Force }
+        } catch { }
+
         $body | Set-Content -Path $resultFile -Encoding UTF8
         Move-Item $task.FullName (Join-Path $done ($id + ".task")) -Force
         Write-Log ("готово " + $id + " → " + $resultFile)
