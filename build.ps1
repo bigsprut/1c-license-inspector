@@ -1,4 +1,4 @@
-# Сборка «Инспектор лицензий 1С» компилятором .NET Framework 4.0 (csc.exe).
+﻿# Сборка «Инспектор лицензий 1С» компилятором .NET Framework 4.0 (csc.exe).
 # Никаких внешних зависимостей: на выходе один exe, работающий на Windows Server 2003 x64
 # (при установленном .NET Framework 4.0) и на Windows Server 2016/2019/2022.
 #
@@ -48,6 +48,12 @@ try {
 
     $exeRel = 'build\1C-License-Inspector.exe'
     if (Test-Path $exeRel) { Remove-Item $exeRel -Force }
+
+    # Обработчик очереди для удалённого тестирования (C#, без PowerShell)
+    if (Test-Path 'tools\Worker.cs') {
+        & $csc /nologo /target:exe /platform:anycpu /optimize+ /codepage:65001 /out:build\Worker.exe tools\Worker.cs
+        if ($LASTEXITCODE -ne 0) { throw 'Не удалось собрать Worker.exe' }
+    }
 
     # 32-битный помощник (встраивается в приложение ресурсом)
     $helperRel = 'tools\Mmc20Dump.cs'

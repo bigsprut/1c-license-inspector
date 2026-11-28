@@ -21,6 +21,7 @@ if (-not $SkipBuild) {
     & (Join-Path $root 'build.ps1') | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Сборка не удалась' }
 if (Test-Path (Join-Path $root 'build\Mmc20Dump.exe')) { Copy-Item (Join-Path $root 'build\Mmc20Dump.exe') (Join-Path $root 'dist\Mmc20Dump.exe') -Force }
+if (Test-Path (Join-Path $root 'build\Worker.exe')) { Copy-Item (Join-Path $root 'build\Worker.exe') (Join-Path $root 'dist\Worker.exe') -Force }
 }
 
 # 2. Скан секретов в том, что попадёт в коммит

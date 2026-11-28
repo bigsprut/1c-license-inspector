@@ -174,6 +174,13 @@
 перенаправленную папку RDP: `\\tsclient\D\work\Learn\DSHarness\1CCommon`.
 
 1. На сервере в RDP-сеансе запустить `Обработчик-ALL.cmd` (2016) или `Обработчик-S200.cmd` (2003).
+   Обработчик — **C#** (`tools\Worker.cs` → `build\Worker.exe`), PowerShell не нужен:
+   на Server 2003 «из коробки» PowerShell **1.0**, где нет `try/catch` и `-ExecutionPolicy`,
+   и PS-версия обработчика там не запускается (проверено 28.11.2026 по отчёту
+   `drop\diag-<host>-s200.txt`: `PowerShell version 1.0.0.0`).
+   `Запуск-с-диагностикой.cmd` пишет в `drop\diag-<host>-<имя>.txt` версию .NET, наличие exe
+   и весь вывод обработчика — этим и нашли причину.
+   Обработчик берёт **самый свежий** exe из `build\` и `dist\` (build\ бывает занят чужим окном).
    Окно закрыть — доступ выключен, в системе ничего не остаётся.
 2. Моя сторона: `.\tools\queue-send.ps1 -Command digest -Server all -TimeoutSec 180`
    (или `-Server s200`). Команды: `noop`, `digest`, `navtest`, `racprobe`, `netstat`,
