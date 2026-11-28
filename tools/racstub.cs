@@ -80,7 +80,7 @@ internal static class RacStub
         "license-type       : soft\nseries             : \"123456789\"\n" +
         "issued-by-server   : yes\nmax-users-all      : 5\nmax-users-cur      : 5\n" +
         "short-presentation : \"Сервер, 123456789 5 5\"\n" +
-        "full-presentation  : \"Сервер, 8732, ALL, 1541, 123456789 5 5, file://C:/ProgramData/1C/licenses/20210712132611.lic\"\n\n";
+        "full-presentation  : \"Сервер, 8732, HOST, 1541, 123456789 5 5, file://C:/ProgramData/1C/licenses/license.lic\"\n\n";
 
     private const string SessionLic =
         "session        : aaaaaaaa-0000-0000-0000-000000000001\n" +

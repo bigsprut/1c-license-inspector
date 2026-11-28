@@ -26,8 +26,8 @@ if (Test-Path (Join-Path $root 'build\Worker.exe')) { Copy-Item (Join-Path $root
 
 # 2. Скан секретов в том, что попадёт в коммит
 Step 'Скан секретов'
-$patterns = '192\.168\.|10\.\d+\.\d+\.\d+|<host>|<pc>|<pc>-|<osuser>|password\s*=|passwd|token\s*=|secret\s*=|BEGIN .*PRIVATE KEY'
-$allowed = '6595b64144ccf1df|bigsprut@mail\.ru'
+$patterns = '192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|\b[0-9]{10}\b|password\s*=|passwd|token\s*=|secret\s*=|BEGIN .*PRIVATE KEY'
+$allowed = '6595b64144ccf1df|bigsprut@mail\.ru|1234567890|0000000000|1111111111'
 $hits = @()
 Get-ChildItem $root -Recurse -File -Include *.cs,*.ps1,*.md,*.txt,*.manifest |
     Where-Object { $_.FullName -notmatch '\\dist\\|\\build\\|\\drop\\|\\queue\\|\\try\\|\\.git\\|\\tools\\publish\.ps1$' } |
