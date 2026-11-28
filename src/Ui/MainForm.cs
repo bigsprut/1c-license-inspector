@@ -536,7 +536,19 @@ namespace OneCLicenseInspector.Ui
             _header.Subtitle = r.System.ComputerName + "  ·  " + r.System.OsCaption + "  ·  " + r.System.OsArch;
             _header.Invalidate();
 
-            foreach (PageBase p in _pages) { if (p != null) { p.SetSnapshot(r); p.Bind(r); p.ScrollTop(); } }
+            foreach (PageBase p in _pages)
+            {
+                if (p == null) continue;
+                p.SetSnapshot(r);
+                // Сбой в одной странице не должен валить всё приложение: пишем в журнал и идём дальше.
+                try { p.Bind(r); }
+                catch (Exception ex)
+                {
+                    Diag.Log("page bind failed (" + p.GetType().Name + "): " + ex.GetType().Name + ": " + ex.Message);
+                    try { r.AddLog(LogLevel.Warn, "Интерфейс", "Страница " + p.GetType().Name + " не отрисовалась: " + ex.Message); } catch { }
+                }
+                p.ScrollTop();
+            }
             BeginInvoke(new Action(delegate { foreach (PageBase p in _pages) { if (p != null) p.ScrollTop(); } }));
 
             _status.Busy = false;

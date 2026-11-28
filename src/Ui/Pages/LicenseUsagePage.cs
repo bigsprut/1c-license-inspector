@@ -220,7 +220,7 @@ namespace OneCLicenseInspector.Ui
                     {
                         row.Licence = sleeping ? "не выдана (спит)" : "—";
                     }
-                    if (sleeping && row.Pin.Length == 0 && row.Licence.Length == 0) row.Licence = "не выдана (спит)";
+                    if (sleeping && string.IsNullOrEmpty(row.Pin) && string.IsNullOrEmpty(row.Licence)) row.Licence = "не выдана (спит)";
                     string pd = CollectLicenses.Digits(row.Pin);
                     if (pd.Length >= 6)
                     {
@@ -337,6 +337,11 @@ namespace OneCLicenseInspector.Ui
 
         public class LicenceRow
         {
+            public LicenceRow()
+            {
+                Pin = ""; Kind = ""; Seats = ""; Used = ""; Free = ""; Source = ""; File = "";
+            }
+
             public string Pin { get; set; }
             public string Kind { get; set; }
             public string Seats { get; set; }
@@ -348,6 +353,12 @@ namespace OneCLicenseInspector.Ui
 
         public class SessionRow
         {
+            public SessionRow()
+            {
+                Pin = ""; User = ""; Host = ""; Infobase = ""; Number = ""; Started = "";
+                Activity = ""; App = ""; State = ""; Licence = ""; Seats = ""; Busy = "";
+            }
+
             public string Pin { get; set; }
             public string User { get; set; }
             public string Host { get; set; }

@@ -96,6 +96,7 @@ namespace OneCLicenseInspector
         public static void ParseLicenseFull(string license, out string kind, out string pin, out int used, out int total, out string file)
         {
             kind = ""; pin = ""; used = -1; total = -1; file = "";
+            if (license == null) return;
             if (string.IsNullOrEmpty(license)) return;
 
             string[] segs = license.Split(',');
