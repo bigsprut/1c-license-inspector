@@ -309,11 +309,25 @@ namespace OneCLicenseInspector
         {
             if (r == null || r.Cluster == null) return;
             bool known = r.Cluster.Available;
+            // Ключи занятости: серия лицензии из rac (8.3), а для импорта из консоли 8.2 —
+            // PIN из текста лицензии и имя файла лицензии (в 8.2 сами файлы зашифрованы).
             List<string> used = new List<string>();
-            foreach (SessionEntry se in r.Cluster.Sessions)
+            Dictionary<string, int> usedFiles = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            List<SessionEntry> all = new List<SessionEntry>();
+            all.AddRange(r.Cluster.Sessions);
+            all.AddRange(r.Cluster.Processes);
+            foreach (SessionEntry se in all)
             {
                 string digits = Digits(se.LicenseSeries);
+                if (digits.Length < 6) digits = Digits(Console82Import.LicensePin(se.LicenseShort));
                 if (digits.Length >= 6) used.Add(digits);
+                string file = FileNameOf(se.LicenseFile);
+                if (file.Length > 0)
+                {
+                    int n;
+                    usedFiles.TryGetValue(file, out n);
+                    usedFiles[file] = n + 1;
+                }
             }
             // Серверную лицензию занимают процессы сервера (ragent/rphost/rmngr), а не сеансы:
             // для неё считаем не сеансы, а «работает ли сервер».
@@ -336,14 +350,30 @@ namespace OneCLicenseInspector
                 }
                 if (!known) { f.UsedBySessions = -1; continue; }
                 string pin = Digits(f.Pin);
-                if (pin.Length < 6) { f.UsedBySessions = -1; continue; }
-                int count = 0;
-                foreach (string s in used)
+                if (pin.Length >= 6)
                 {
-                    if (PinMatches(s, pin)) count++;
+                    int count = 0;
+                    foreach (string s in used)
+                    {
+                        if (PinMatches(s, pin)) count++;
+                    }
+                    f.UsedBySessions = count;
+                    continue;
                 }
-                f.UsedBySessions = count;
+                // PIN из зашифрованного файла 8.2 не читается — пробуем привязку по имени файла.
+                int byFile;
+                f.UsedBySessions = usedFiles.TryGetValue(f.FileName ?? "", out byFile) ? byFile : -1;
             }
+        }
+
+        /// <summary>Только имя файла из строки вида «file://C:/…/20210712132611.lic».</summary>
+        internal static string FileNameOf(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return "";
+            string s = path.Trim();
+            int slash = s.LastIndexOfAny(new char[] { '\\', '/' });
+            if (slash >= 0) s = s.Substring(slash + 1);
+            return s.Trim().Trim('"');
         }
 
         /// <summary>Только цифры: «123456789O0» → «1234567890».</summary>
