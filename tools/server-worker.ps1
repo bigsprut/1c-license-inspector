@@ -104,6 +104,21 @@ function Get-AppLogPath {
     return ""
 }
 
+# Если открыто несколько окон обработчика на один сервер, они дерутся за одну очередь
+# (результаты «то есть, то нет»). Оставляем только этот экземпляр.
+try {
+    $me = $PID
+    $others = Get-WmiObject -Query "SELECT ProcessId,CommandLine FROM Win32_Process WHERE Name='powershell.exe'"
+    foreach ($p in $others) {
+        if ($p.ProcessId -eq $me) { continue }
+        if ($p.CommandLine -eq $null) { continue }
+        if ($p.CommandLine.IndexOf("server-worker.ps1") -lt 0) { continue }
+        if ($p.CommandLine.IndexOf("-Name " + $Name) -lt 0) { continue }
+        Write-Log ("снимаю лишнее окно обработчика: pid=" + $p.ProcessId)
+        try { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue } catch { }
+    }
+} catch { }
+
 # Подчистить зависшие экземпляры (например, после проверки GUI в фоновом сеансе):
 # они держат локальную копию сборки и мешают её обновлять.
 try {
