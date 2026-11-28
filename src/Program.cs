@@ -145,7 +145,15 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.6.2";
+        public const string Version = "1.6.3";
+
+        // Авторство — в одном месте: показывается в статусной строке, в «О программе»,
+        // в HTML-отчёте и в дайджесте (28.11.2026 просил Сергей: PrS, bigsprut@mail.ru).
+        public const string Author = "PrS";
+        public const string AuthorEmail = "bigsprut@mail.ru";
+        public const string AuthorUrl = "https://github.com/bigsprut";
+        public const string AppName = "Инспектор лицензий 1С";
+        public static string AuthorLine { get { return Author + " <" + AuthorEmail + ">"; } }
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -202,6 +210,35 @@ namespace OneCLicenseInspector
                 NavTest = Has(args, "/navtest");
                 DebugLog = Has(args, "/debug");
                 Boot("text rendering ok");
+
+                // /about — показать «О программе» и закрыть (для автопроверки; в обычной
+                // работе окно открывается по F1 или щелчку по подписи автора).
+                if (Has(args, "/about"))
+                {
+                    string aboutShot = Arg(args, "/shot");
+                    if (!string.IsNullOrEmpty(aboutShot))
+                    {
+                        // Скриншот окна «О программе» — для README и проверки вёрстки.
+                        using (Form af = Ui.AboutBox.Create(AppName, 0))
+                        {
+                            bool interactive = System.Diagnostics.Process.GetCurrentProcess().SessionId != 0;
+                            af.StartPosition = FormStartPosition.Manual;
+                            af.Location = new System.Drawing.Point(-5000, -5000);
+                            if (interactive) af.Show(); else af.CreateControl();
+                            af.PerformLayout();
+                            Application.DoEvents();
+                            using (System.Drawing.Bitmap bmp = new System.Drawing.Bitmap(af.Width, af.Height))
+                            {
+                                af.DrawToBitmap(bmp, new System.Drawing.Rectangle(0, 0, af.Width, af.Height));
+                                bmp.Save(aboutShot, System.Drawing.Imaging.ImageFormat.Png);
+                            }
+                            if (interactive) af.Hide();
+                        }
+                        return 0;
+                    }
+                    Ui.AboutBox.Show(null, AppName, Has(args, "/selftest") ? 900 : 0);
+                    return 0;
+                }
 
                 string mmc20 = Arg(args, "/mmc20");
                 if (!string.IsNullOrEmpty(mmc20))

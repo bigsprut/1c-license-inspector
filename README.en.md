@@ -141,7 +141,13 @@ Every tag `v*` is built automatically by GitHub Actions and attached to the rele
 
 ## Author and terms
 
-Author: **PrS**, <bigsprut@mail.ru>.
+Author: **PrS**, <bigsprut@mail.ru> · [github.com/bigsprut](https://github.com/bigsprut).
+
+The author is also shown inside the app: **PrS <bigsprut@mail.ru>** in the status bar
+(click it — or press **F1** — for the About box), in the exe metadata (company/copyright),
+in the HTML report and in the text digest.
+
+![About](docs/img/about.png)
 
 Not affiliated with 1C. “1C”, “HASP” and “Sentinel” are trademarks of their owners.
 Provided as is, without warranty. No license is granted for reuse; contact the author.

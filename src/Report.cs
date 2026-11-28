@@ -9,7 +9,7 @@ namespace OneCLicenseInspector
         public static string BuildDigest(ScanResult r, string logTail)
         {
             StringBuilder b = new StringBuilder();
-            b.AppendLine("Инспектор лицензий 1С " + Program.Version);
+            b.AppendLine("Инспектор лицензий 1С " + Program.Version + " · автор " + Program.AuthorLine);
             b.AppendLine("Компьютер: " + r.System.ComputerName + " · " + r.System.OsCaption + " " + r.System.OsArch);
             b.AppendLine("Проверка: " + r.Finished.ToString("dd.MM.yyyy HH:mm"));
             b.AppendLine();
@@ -457,7 +457,7 @@ namespace OneCLicenseInspector
             }
             b.AppendLine("</pre>");
 
-            b.AppendLine("<div class=\"foot\">Отчёт сформирован программой «Инспектор лицензий 1С» " + H(Program.Version) + " · " + H(Fmt.Date(r.Finished)) + "</div>");
+            b.AppendLine("<div class=\"foot\">Отчёт сформирован программой «Инспектор лицензий 1С» " + H(Program.Version) + " · " + H(Fmt.Date(r.Finished)) + "<br>Автор: " + H(Program.Author) + " &lt;" + H(Program.AuthorEmail) + "&gt; · " + H(Program.AuthorUrl) + "</div>");
             b.AppendLine("</body></html>");
             return b.ToString();
         }

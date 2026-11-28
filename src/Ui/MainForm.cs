@@ -203,6 +203,9 @@ namespace OneCLicenseInspector.Ui
             }
 
             _status = new StatusBarEx();
+            // Автор — постоянной подписью справа; щелчок открывает «О программе» (как и F1).
+            _status.RightText = Program.AuthorLine;
+            _status.MouseClick += delegate { AboutBox.Show(this, Program.AppName); };
             if (Program.BareLevel >= 3)
             {
                 _status.Dock = DockStyle.Bottom;
@@ -430,6 +433,7 @@ namespace OneCLicenseInspector.Ui
         private void MainFormKeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.F5) StartScan();
+            if (e.KeyCode == Keys.F1) AboutBox.Show(this, Program.AppName);
             if (e.Control && e.KeyCode == Keys.E) ExportReport();
             if (e.Control && e.KeyCode == Keys.C)
             {
@@ -555,8 +559,9 @@ namespace OneCLicenseInspector.Ui
             _status.Busy = false;
             _status.LeftText = "Готово · найдено платформ: " + r.Platforms.Count + ", ключей: " + r.Sentinel.Keys.Count +
                                ", файлов лицензий: " + r.LicenseFiles.Count +
-                               ", предупреждений: " + r.Warnings.Count;
-            _status.RightText = "обновлено " + r.Finished.ToString("HH:mm") + "  ·  " + Fmt.Duration(r.Finished - r.Started);
+                               ", предупреждений: " + r.Warnings.Count +
+                               "  ·  обновлено " + r.Finished.ToString("HH:mm");
+            _status.RightText = Program.AuthorLine;
             _status.Invalidate();
         }
 

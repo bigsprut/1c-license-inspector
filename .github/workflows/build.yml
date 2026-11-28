@@ -53,7 +53,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             gh release create $tag build/1C-License-Inspector.exe build/1C-License-Inspector-Lite.exe build/Mmc20Dump.exe `
               --title "1C License Inspector $tag" `
-              --notes "Automated build for $tag"
+              --notes "Автор: PrS <bigsprut@mail.ru>. Автоматическая сборка GitHub Actions для $tag."
           } else {
             gh release upload $tag build/1C-License-Inspector.exe build/1C-License-Inspector-Lite.exe build/Mmc20Dump.exe --clobber
           }

@@ -50,7 +50,9 @@ namespace OneCLicenseInspector.Lite
             _status = new Ui.StatusBarEx();
             _status.Dock = DockStyle.Bottom;
             _status.LeftText = "Готово";
-            _status.RightText = "Версия " + Program.Version;
+            // Автор — постоянной подписью справа; щелчок открывает «О программе» (как и F1).
+            _status.RightText = Program.AuthorLine;
+            _status.MouseClick += delegate { Ui.AboutBox.Show(this, Program.AppName + " — кратко"); };
             Controls.Add(_status);
 
             _tabs = new Ui.SegmentedTabs();
@@ -83,6 +85,7 @@ namespace OneCLicenseInspector.Lite
             KeyDown += delegate (object s, KeyEventArgs e)
             {
                 if (e.KeyCode == Keys.F5) { StartScan(); e.Handled = true; }
+                else if (e.KeyCode == Keys.F1) { Ui.AboutBox.Show(this, Program.AppName + " — кратко"); e.Handled = true; }
                 else if (e.Control && e.KeyCode == Keys.C) { CopyCurrent(); e.Handled = true; }
             };
 
@@ -162,9 +165,10 @@ namespace OneCLicenseInspector.Lite
             _scanning = false;
             _header.SetBusy(false);
             _status.Busy = false;
-            _status.LeftText = "Лицензий: " + _licencesPage.Count + " · сеансов: " + _sessionsPage.Count;
-            _status.RightText = "обновлено " + DateTime.Now.ToString("HH:mm") +
-                                " · " + Math.Max(1, (int)(r.Finished - r.Started).TotalSeconds) + " с";
+            _status.LeftText = "Лицензий: " + _licencesPage.Count + " · сеансов: " + _sessionsPage.Count +
+                               "  ·  обновлено " + DateTime.Now.ToString("HH:mm") +
+                               " (" + Math.Max(1, (int)(r.Finished - r.Started).TotalSeconds) + " с)";
+            _status.RightText = Program.AuthorLine;
             _status.Invalidate();
         }
 
