@@ -26,6 +26,12 @@ try {
     if (-not (Test-Path $iconRel)) {
         & (Join-Path $root 'tools\make-icon.ps1') -OutPath (Join-Path $root $iconRel)
     }
+    # Иконка краткого приложения — своя (бирюзовая, с «вкладками»), чтобы в панели задач
+    # и в списке процессов два приложения не путались.
+    $iconLiteRel = 'res\app-lite.ico'
+    if (-not (Test-Path $iconLiteRel)) {
+        & (Join-Path $root 'tools\make-icon.ps1') -Variant lite -OutPath (Join-Path $root $iconLiteRel)
+    }
 
     $sources = Get-ChildItem 'src' -Recurse -Filter *.cs | ForEach-Object { $_.FullName.Substring($root.Length + 1) }
     if ($sources.Count -eq 0) { throw 'Не найдены файлы исходного кода.' }
@@ -129,6 +135,7 @@ try {
     foreach ($a in $cscArgs) {
         if ($a -like '/out:*') { $liteArgs += ('/out:' + $liteRel); continue }
         if ($a -eq '/main:OneCLicenseInspector.Program') { $liteArgs += '/main:OneCLicenseInspector.Lite.LiteProgram'; continue }
+        if ($a -eq ('/win32icon:' + $iconRel)) { $liteArgs += ('/win32icon:' + $iconLiteRel); continue }
         $liteArgs += $a
     }
     Get-Process '1C-License-Inspector-Lite' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue

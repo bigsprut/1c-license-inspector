@@ -1,6 +1,6 @@
 # Передача смены: «Инспектор лицензий 1С»
 
-**Состояние на 28.11.2026, версия 1.6.1.** Читать вместе с навыком
+**Состояние на 28.11.2026, версия 1.6.2.** Читать вместе с навыком
 `1c-license-audit` (`D:\dsh\skills\1c-license-audit\SKILL.md` + `MMC20.md`,
 `CONSOLE82.md`, `LICENSES.md`) и `D:\dsh\memory\projects.md`.
 
@@ -8,13 +8,15 @@
 
 - Проект: `D:\work\Learn\DSHarness\1CCommon`
 - Репозиторий: https://github.com/bigsprut/1c-license-inspector (автор PrS <bigsprut@mail.ru>)
-- Версия: **1.6.1**, релизы `v1.0.0`–`v1.6.1`
+- Версия: **1.6.2**, релизы `v1.0.0`–`v1.6.2`
 - Сборка: `.\build.ps1` — собирает **три вещи**: полное приложение, краткое приложение
   (`build\1C-License-Inspector-Lite.exe`, с 1.6.0) и обработчик `build\Worker.exe`, затем
   копирует оба приложения в `dist\` и сверяет SHA-256 каждой пары. **Основной файл для запуска —
   `build\1C-License-Inspector.exe`**, копии релиза — `dist\1C-License-Inspector.exe` и
   `dist\1C-License-Inspector-Lite.exe`. Оба exe собираются из одних исходников, разница только
-  в точке входа (`/main:OneCLicenseInspector.Program` против `...Lite.LiteProgram`).
+  в точке входа (/main:OneCLicenseInspector.Program против ...Lite.LiteProgram) и в иконке
+  (с 1.6.2: es\app.ico — янтарная, es\app-lite.ico — бирюзовая с «вкладками»;
+  генерируются 	ools\make-icon.ps1 -Variant full|lite).
 - Публикация: `.\tools\publish.ps1 -Message "…"` (сборка + скан секретов + commit + push);
   тег `vX.Y.Z` → GitHub Actions соберёт и оформит релиз. Пуш разрешён Сергеем постоянно.
 - Скрипты PowerShell — **UTF-8 с BOM**; `.cmd` — **только ASCII и CRLF** (иначе cmd «съедает» символы).
