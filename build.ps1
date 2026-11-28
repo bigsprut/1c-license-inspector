@@ -76,16 +76,24 @@ try {
 
     # Обработчик очереди для удалённого тестирования (C#, без PowerShell).
     # Собираем во временный файл: build\Worker.exe может быть занят запущенным на сервере
-    # обработчиком (он берёт exe по UNC-пути) — тогда просто оставляем прежний.
+    # обработчиком (он берёт exe по UNC-пути). Тогда новый бинарник оставляем рядом
+    # как Worker-ready.exe — чтобы его можно было подменить после закрытия окна обработчика,
+    # а не пересобирать всё заново.
     if (Test-Path 'tools\Worker.cs') {
         $tmpWorker = 'build\Worker.new.exe'
+        Remove-Item 'build\Worker-ready.exe' -Force -ErrorAction SilentlyContinue
         & $csc /nologo /target:exe /platform:anycpu /optimize+ /codepage:65001 /out:$tmpWorker tools\Worker.cs
         if ($LASTEXITCODE -eq 0 -and (Test-Path $tmpWorker)) {
             try {
                 Move-Item $tmpWorker 'build\Worker.exe' -Force -ErrorAction Stop
             } catch {
-                Write-Host 'ВНИМАНИЕ: build\Worker.exe занят (обработчик запущен на сервере) — оставляю прежний.'
-                Remove-Item $tmpWorker -Force -ErrorAction SilentlyContinue
+                try {
+                    Move-Item $tmpWorker 'build\Worker-ready.exe' -Force -ErrorAction Stop
+                    Write-Host 'ВНИМАНИЕ: build\Worker.exe занят (обработчик запущен на сервере) — новая сборка в build\Worker-ready.exe, подменить после закрытия окна обработчика.'
+                } catch {
+                    Write-Host 'ВНИМАНИЕ: build\Worker.exe занят, и Worker-ready.exe тоже не записался — оставляю прежний.'
+                    Remove-Item $tmpWorker -Force -ErrorAction SilentlyContinue
+                }
             }
         } else {
             throw 'Не удалось собрать Worker.exe'
