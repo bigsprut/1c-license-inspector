@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -356,6 +357,8 @@ namespace OneCLicenseInspector
                     s.User = rec.Get("user-name");
                     s.Host = rec.Get("host-name");
                     if (string.IsNullOrEmpty(s.Host)) s.Host = rec.Get("host");
+                    if (!string.IsNullOrEmpty(s.Host)) s.HostSource = "rac";
+                    s.ClientIp = rec.Get("client-ip");
                     s.AppId = rec.Get("app-id");
                     s.InfobaseId = rec.Get("infobase");
                     string baseName;
@@ -367,6 +370,9 @@ namespace OneCLicenseInspector
                     ApplyLicense(s, rec);
                     c.Sessions.Add(s);
                 }
+
+                // У спящих сеансов имени компьютера нет — добираем по адресу клиента.
+                FillHostsFromClientIp(r, c);
 
                 // Лицензионные поля сеансу rac отдаёт отдельным ответом (--licenses): на этом
                 // кластере он содержит только лицензионную часть. Запрашиваем его один раз
@@ -512,6 +518,123 @@ namespace OneCLicenseInspector
                 c.Processes.Add(p);
             }
             Diag.Log("rac processes parsed=" + c.Processes.Count);
+        }
+
+        /// <summary>
+        /// Имя компьютера для сеансов, у которых rac не отдал host. У спящего сеанса другого пути
+        /// нет: connection и process у него нулевые UUID, поэтому `connection list` ничего не даёт
+        /// (проверено на живом кластере 28.11.2026 — в нём только соединения серверных процессов).
+        /// Остаётся client-ip: для внутренних адресов пробуем обратный DNS (в домене это имя
+        /// рабочей станции), иначе оставляем адрес как есть и говорим об этом прямо.
+        /// </summary>
+        private static void FillHostsFromClientIp(ScanResult r, ClusterInfo c)
+        {
+            List<SessionEntry> need = new List<SessionEntry>();
+            List<string> ips = new List<string>();
+            foreach (SessionEntry s in c.Sessions)
+            {
+                if (!string.IsNullOrEmpty(s.Host)) continue;
+                string ip = NormalizeIp(s.ClientIp);
+                if (ip.Length == 0) continue;
+                need.Add(s);
+                if (!ips.Contains(ip)) ips.Add(ip);
+            }
+            if (need.Count == 0) return;
+
+            // Обратный DNS — только для внутренних адресов: у внешнего NAT-адреса PTR отдаёт
+            // имя провайдера, и «Компьютер = host-185-39-113-105.isp.ru» путало бы сильнее пустоты.
+            int resolved = 0, asked = 0;
+            Dictionary<string, string> names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string ip in ips)
+            {
+                if (asked >= 12) break;
+                if (!IsPrivateIp(ip)) continue;
+                asked++;
+                string name = ReverseLookup(ip);
+                names[ip] = name;
+                if (name.Length > 0) resolved++;
+            }
+            foreach (SessionEntry s in need)
+            {
+                string ip = NormalizeIp(s.ClientIp);
+                string name;
+                if (ip.Length > 0 && names.TryGetValue(ip, out name) && !string.IsNullOrEmpty(name))
+                {
+                    s.Host = name;
+                    s.HostSource = "dns";
+                }
+            }
+            Diag.Log("client-ip: сеансов без имени " + need.Count + ", адресов " + ips.Count +
+                     ", обратный DNS спрошен у " + asked + ", имён получено " + resolved);
+
+            string note = "У спящих сеансов rac не отдаёт имя компьютера — показан адрес клиента (client-ip)." +
+                          (asked > 0 && resolved == 0 ? " Обратный DNS имён не дал." : "");
+            c.Note = string.IsNullOrEmpty(c.Note) ? note : c.Note + " " + note;
+            r.AddLog(LogLevel.Info, "Кластер", "Сеансов без имени компьютера: " + need.Count +
+                                             " · адрес клиента известен у " + ips.Count);
+        }
+
+        /// <summary>Отбрасывает пустые и служебные адреса, возвращает адрес для показа.</summary>
+        internal static string NormalizeIp(string raw)
+        {
+            string s = (raw ?? "").Trim();
+            if (s.Length == 0) return "";
+            if (s == "0.0.0.0" || s == "::" || s == "::0" || s == "::1") return "";
+            if (s.StartsWith("127.", StringComparison.Ordinal)) return "";
+            IPAddress addr;
+            if (!IPAddress.TryParse(s, out addr)) return "";
+            if (IPAddress.IsLoopback(addr)) return "";
+            return s;
+        }
+
+        /// <summary>Внутренний ли адрес: обратный DNS по нему имеет смысл только в своей сети.</summary>
+        private static bool IsPrivateIp(string ip)
+        {
+            try
+            {
+                IPAddress a;
+                if (!IPAddress.TryParse(ip, out a)) return false;
+                if (a.AddressFamily == AddressFamily.InterNetwork)
+                {
+                    byte[] b = a.GetAddressBytes();
+                    return b[0] == 10 ||
+                           (b[0] == 172 && b[1] >= 16 && b[1] <= 31) ||
+                           (b[0] == 192 && b[1] == 168) ||
+                           (b[0] == 169 && b[1] == 254) ||
+                           (b[0] == 100 && b[1] >= 64 && b[1] <= 127);
+                }
+                if (a.AddressFamily == AddressFamily.InterNetworkV6)
+                {
+                    byte[] b = a.GetAddressBytes();
+                    return (b[0] & 0xFE) == 0xFC || (b[0] == 0xFE && (b[1] & 0xC0) == 0x80);
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>
+        /// Обратный DNS с жёстким потолком ожидания: сервер без DNS не должен задерживать сбор.
+        /// Имя, совпавшее с самим адресом, именем не считается.
+        /// </summary>
+        private static string ReverseLookup(string ip)
+        {
+            try
+            {
+                IPAddress addr;
+                if (!IPAddress.TryParse(ip, out addr)) return "";
+                IAsyncResult ar = Dns.BeginGetHostEntry(addr, null, null);
+                if (!ar.AsyncWaitHandle.WaitOne(900)) return "";
+                IPHostEntry entry = Dns.EndGetHostEntry(ar);
+                string name = entry == null ? "" : (entry.HostName ?? "");
+                name = name.Trim().TrimEnd('.');
+                if (name.Length == 0) return "";
+                IPAddress same;
+                if (IPAddress.TryParse(name, out same)) return "";
+                if (string.Equals(name, ip, StringComparison.OrdinalIgnoreCase)) return "";
+                return name;
+            }
+            catch { return ""; }
         }
 
         private static string YesNo(string v)

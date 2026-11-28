@@ -1,4 +1,4 @@
-﻿# Публикация проекта на GitHub: сборка -> скан секретов -> коммит -> пуш.
+# Публикация проекта на GitHub: сборка -> скан секретов -> коммит -> пуш.
 # Использование:
 #   .\tools\publish.ps1 -Message "Что изменилось"
 #   .\tools\publish.ps1 -Message "..." -SkipBuild
@@ -30,7 +30,7 @@ $patterns = '192\.168\.|10\.\d+\.\d+\.\d+|<host>|<pc>|<pc>-|<osuser>|password\s*
 $allowed = '6595b64144ccf1df|bigsprut@mail\.ru'
 $hits = @()
 Get-ChildItem $root -Recurse -File -Include *.cs,*.ps1,*.md,*.txt,*.manifest |
-    Where-Object { $_.FullName -notmatch '\\dist\\|\\build\\|\\drop\\|\\queue\\|\\.git\\|\\tools\\publish\.ps1$' } |
+    Where-Object { $_.FullName -notmatch '\\dist\\|\\build\\|\\drop\\|\\queue\\|\\try\\|\\.git\\|\\tools\\publish\.ps1$' } |
     ForEach-Object {
         $file = $_
         Select-String -Path $file.FullName -Pattern $patterns -AllMatches -ErrorAction SilentlyContinue |

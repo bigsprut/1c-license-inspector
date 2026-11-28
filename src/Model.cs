@@ -323,6 +323,13 @@ namespace OneCLicenseInspector
         public string LastActivity = "";
         public string User = "";
         public string Host = "";
+        /// <summary>
+        /// Адрес клиента из rac (client-ip). У спящего сеанса это единственное, что говорит
+        /// о компьютере: имя rac не отдаёт, а connection/process у такого сеанса нулевые.
+        /// </summary>
+        public string ClientIp = "";
+        /// <summary>Откуда имя компьютера: «rac» (поле host), «dns» (обратный поиск по IP) или пусто.</summary>
+        public string HostSource = "";
         public string AppId = "";
         public string Infobase = "";
         public string InfobaseId = "";

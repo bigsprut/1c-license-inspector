@@ -10,6 +10,9 @@ final-check.*
 ui-page*.png
 shot-*.png
 
+# Рабочая папка для локальных прогонов (selftest, отчёты, снимки)
+try/
+
 # Visual Studio / Rider
 .vs/
 .idea/

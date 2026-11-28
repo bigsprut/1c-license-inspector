@@ -64,6 +64,10 @@ namespace OneCLicenseInspector.Ui
             _sessions.Columns.Add(Col("Рег. номер", "Pin", 115));
             _sessions.Columns.Add(Col("Пользователь", "User", 130));
             _sessions.Columns.Add(Col("Компьютер", "Host", 110));
+            DataGridViewColumn ipCol = Col("IP", "Ip", 95);
+            ipCol.ToolTipText = "Адрес клиента из rac (client-ip). У спящего сеанса 1С не отдаёт имя " +
+                                "компьютера вообще, поэтому адрес — единственное, что известно о машине.";
+            _sessions.Columns.Add(ipCol);
             _sessions.Columns.Add(Col("Инф. база", "Infobase", 120));
             _sessions.Columns.Add(Col("№", "Number", 60));
             _sessions.Columns.Add(Col("Начало", "Started", 120));
@@ -190,6 +194,7 @@ namespace OneCLicenseInspector.Ui
                     SessionRow row = new SessionRow();
                     row.User = string.IsNullOrEmpty(se.User) ? "—" : se.User;
                     row.Host = se.Host;
+                    row.Ip = CollectCluster.NormalizeIp(se.ClientIp);
                     row.Infobase = Shorten(se.Infobase, 34);
                     row.Number = string.IsNullOrEmpty(se.SessionNum) ? se.SessionId : se.SessionNum;
                     if (row.Number.Length > 10) row.Number = row.Number.Substring(0, 8) + "…";
@@ -265,6 +270,14 @@ namespace OneCLicenseInspector.Ui
             hint.Add("Лицензий: " + licences.Count);
             if (seatsTotal > 0) hint.Add("мест: занято " + busyTotal + " из " + seatsTotal);
             hint.Add("сеансов: " + sessions.Count);
+            // Спящий сеанс 1С отдаёт без имени компьютера — предупреждаем, что в столбце «IP»
+            // не украшение, а всё, что о машине известно.
+            int ipOnly = 0;
+            foreach (SessionRow row in sessions)
+            {
+                if (string.IsNullOrEmpty(row.Host) && !string.IsNullOrEmpty(row.Ip)) ipOnly++;
+            }
+            if (ipOnly > 0) hint.Add("только IP (имени 1С не отдаёт): " + ipOnly);
             if (r.Cluster != null && !string.IsNullOrEmpty(r.Cluster.Error)) hint.Add("кластер: " + r.Cluster.Error);
             _hint.Text = string.Join(" · ", hint.ToArray());
         }
@@ -285,10 +298,10 @@ namespace OneCLicenseInspector.Ui
             }
             b.AppendLine();
             b.AppendLine("ИСПОЛЬЗОВАНИЕ ЛИЦЕНЗИЙ СЕАНСАМИ (" + _sessionItems.Count + ")");
-            b.AppendLine("Рег. номер\tПользователь\tКомпьютер\tИнф. база\t№\tНачало\tАктивность\tПриложение\tСостояние\tЛицензия\tМест\tЗанято");
+            b.AppendLine("Рег. номер\tПользователь\tКомпьютер\tIP\tИнф. база\t№\tНачало\tАктивность\tПриложение\tСостояние\tЛицензия\tМест\tЗанято");
             foreach (SessionRow s in _sessionItems)
             {
-                b.AppendLine(Join(s.Pin, s.User, s.Host, s.Infobase, s.Number, s.Started, s.Activity,
+                b.AppendLine(Join(s.Pin, s.User, s.Host, s.Ip, s.Infobase, s.Number, s.Started, s.Activity,
                                   s.App, s.State, s.Licence, s.Seats, s.Busy));
             }
             return b.ToString();
@@ -355,13 +368,15 @@ namespace OneCLicenseInspector.Ui
         {
             public SessionRow()
             {
-                Pin = ""; User = ""; Host = ""; Infobase = ""; Number = ""; Started = "";
+                Pin = ""; User = ""; Host = ""; Ip = ""; Infobase = ""; Number = ""; Started = "";
                 Activity = ""; App = ""; State = ""; Licence = ""; Seats = ""; Busy = "";
             }
 
             public string Pin { get; set; }
             public string User { get; set; }
             public string Host { get; set; }
+            /// <summary>Адрес клиента: у спящего сеанса имени компьютера 1С не отдаёт.</summary>
+            public string Ip { get; set; }
             public string Infobase { get; set; }
             public string Number { get; set; }
             public string Started { get; set; }

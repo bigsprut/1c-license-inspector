@@ -241,6 +241,10 @@ namespace OneCLicenseInspector.Ui
             _sessions.Columns.Add(Col("Номер", "SessionId", 70));
             _sessions.Columns.Add(Col("Начало", "StartedAt", 118));
             _sessions.Columns.Add(Col("Компьютер", "Host", 110));
+            DataGridViewColumn sessIp = Col("IP", "ClientIp", 88);
+            sessIp.ToolTipText = "Адрес клиента из rac (client-ip). У спящего сеанса имя компьютера " +
+                                 "1С не отдаёт совсем — адрес остаётся единственной приметой машины.";
+            _sessions.Columns.Add(sessIp);
             _sessions.Columns.Add(Col("Пользователь", "User", 130));
             _sessions.Columns.Add(Col("Приложение", "AppId", 92));
             _sessions.Columns.Add(Col("Состояние", "State", 78));
@@ -580,6 +584,7 @@ namespace OneCLicenseInspector.Ui
                 row.SessionId = string.IsNullOrEmpty(s.SessionNum) ? ShortId(s.SessionId) : s.SessionNum;
                 row.StartedAt = ShortDate(s.StartedAt);
                 row.Host = s.Host;
+                row.ClientIp = CollectCluster.NormalizeIp(s.ClientIp);
                 row.User = string.IsNullOrEmpty(s.User) ? "—" : s.User;
                 row.AppId = s.AppId;
                 string licKind, licPin, licFile; int licUsed, licTotal;
@@ -714,7 +719,15 @@ namespace OneCLicenseInspector.Ui
             SessionEntry s = _sessionItems[idx];
             List<string> lines = new List<string>();
             lines.Add("Пользователь : " + (string.IsNullOrEmpty(s.User) ? "(не определён)" : s.User));
-            lines.Add("Компьютер    : " + s.Host);
+            string clientIp = CollectCluster.NormalizeIp(s.ClientIp);
+            lines.Add("Компьютер    : " + (string.IsNullOrEmpty(s.Host)
+                ? (clientIp.Length > 0 ? "не определён — 1С не отдаёт имя у спящего сеанса" : "")
+                : s.Host));
+            if (clientIp.Length > 0)
+                lines.Add("Адрес клиента: " + clientIp +
+                          (string.Equals(s.HostSource, "dns", StringComparison.OrdinalIgnoreCase)
+                              ? " · имя компьютера получено обратным DNS"
+                              : ""));
             lines.Add("Приложение   : " + s.AppId);
             lines.Add("База         : " + s.Infobase +
                       (!string.IsNullOrEmpty(s.InfobaseId) && s.InfobaseId != s.Infobase ? " (" + s.InfobaseId + ")" : ""));
@@ -902,6 +915,8 @@ namespace OneCLicenseInspector.Ui
             public string SessionId { get; set; }
             public string StartedAt { get; set; }
             public string Host { get; set; }
+            /// <summary>Адрес клиента: у спящего сеанса имя компьютера 1С не отдаёт.</summary>
+            public string ClientIp { get; set; }
             public string User { get; set; }
             public string AppId { get; set; }
             public string State { get; set; }

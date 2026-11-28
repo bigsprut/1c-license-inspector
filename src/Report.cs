@@ -72,7 +72,8 @@ namespace OneCLicenseInspector
                     b.AppendLine("  процесс: " + s.User + " " + s.Host + " pid=" + s.SessionId + " " + s.LicenseShort);
                 foreach (SessionEntry s in c.Sessions)
                 {
-                    b.AppendLine("  сеанс: user=" + s.User + " host=" + s.Host + " infobase=" + s.Infobase +
+                    b.AppendLine("  сеанс: user=" + s.User + " host=" + s.Host +
+                                 (string.IsNullOrEmpty(s.ClientIp) ? "" : " ip=" + s.ClientIp) + " infobase=" + s.Infobase +
                                  " session=" + s.SessionId + " app=" + s.AppId + " started=" + s.StartedAt +
                                  " lic-type=" + s.LicenseType + " series=" + s.LicenseSeries +
                                  " issued=" + s.IssuedByServer + " max=" + s.MaxUsersCur + "/" + s.MaxUsersAll +
@@ -398,7 +399,19 @@ namespace OneCLicenseInspector
                 }
                 else
                 {
-                b.AppendLine("<table><tr><th>Пользователь</th><th>Компьютер</th><th>Приложение</th><th>База</th><th>Начало</th><th>Лицензия</th><th>Мест</th></tr>");
+                // У спящих сеансов 1С не отдаёт имя компьютера — столбец с адресом клиента
+                // показываем только тогда, когда адреса действительно есть.
+                bool anyIp = false;
+                int onlyIp = 0;
+                foreach (SessionEntry sv in r.Cluster.Sessions)
+                {
+                    if (CollectCluster.NormalizeIp(sv.ClientIp).Length == 0) continue;
+                    anyIp = true;
+                    if (string.IsNullOrEmpty(sv.Host)) onlyIp++;
+                }
+                b.AppendLine("<table><tr><th>Пользователь</th><th>Компьютер</th>" +
+                             (anyIp ? "<th>IP клиента</th>" : "") +
+                             "<th>Приложение</th><th>База</th><th>Начало</th><th>Лицензия</th><th>Мест</th></tr>");
                 foreach (SessionEntry s in r.Cluster.Sessions)
                 {
                     string lic = s.LicenseShort;
@@ -409,10 +422,14 @@ namespace OneCLicenseInspector
                     string seats = s.MaxUsersCur;
                     if (!string.IsNullOrEmpty(s.MaxUsersAll)) seats = seats + " / " + s.MaxUsersAll;
                     b.AppendLine("<tr><td><b>" + H(s.User.Length == 0 ? "(не определён)" : s.User) + "</b></td><td>" + H(s.Host) +
+                                (anyIp ? "</td><td class=\"muted\">" + H(CollectCluster.NormalizeIp(s.ClientIp)) : "") +
                                 "</td><td>" + H(s.AppId) + "</td><td class=\"muted\">" + H(ShortId(s.Infobase)) + "</td><td>" + H(s.StartedAt) +
                                 "</td><td>" + H(lic) + "</td><td>" + H(seats) + "</td></tr>");
                 }
                 b.AppendLine("</table>");
+                if (onlyIp > 0)
+                    b.AppendLine("<p class=\"note\">У спящих сеансов 1С не отдаёт имя компьютера: у " + onlyIp +
+                                 " из них в столбце «IP клиента» — адрес, по которому машину ищут в сети.</p>");
                 }
                 if (!string.IsNullOrEmpty(r.Cluster.Error)) b.AppendLine("<p class=\"note\">" + H(r.Cluster.Error) + "</p>");
             }

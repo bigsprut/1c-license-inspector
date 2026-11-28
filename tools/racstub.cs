@@ -9,6 +9,9 @@ using System.Text;
 //            Проверяет запасной запрос без --licenses и честный вывод «сеансов нет».
 //   admins — администраторы есть: `cluster admin list` читается анонимно, сеансы
 //            отдаются только логином rac_admin. Проверяет автоподбор логина.
+//   sleep  — как на сервере ALL 28.11.2026: единственный сеанс спящий, имени компьютера
+//            нет, connection и process — нулевые UUID, зато есть client-ip. Проверяет,
+//            что адрес клиента подставляется вместо пустого «Компьютера».
 //
 // Сборка: csc /out:build\racstub.exe /codepage:65001 tools\racstub.cs
 // Запуск приложения: /rac:build\racstub.exe /clusteruser:… /clusterpwd:…
@@ -89,12 +92,33 @@ internal static class RacStub
         "issued-by-server : ALL\nmax-users-all  : 5\nmax-users-cur  : 1\n" +
         "short-presentation : \"1С:Предприятие 8 (5)\"\n\n";
 
+    // Спящий сеанс, как на живом кластере 28.11.2026: имени компьютера rac не отдаёт,
+    // connection и process — нулевые UUID (поэтому connection list не поможет), но client-ip есть.
+    // Адрес по умолчанию — 192.0.2.34 (TEST-NET-1, зарезервирован для документации);
+    // RACSTUB_IP=<адрес> подставляет свой, например внутренний, чтобы проверить обратный DNS.
+    private static string SleepySession()
+    {
+        string ip = (Environment.GetEnvironmentVariable("RACSTUB_IP") ?? "").Trim();
+        if (ip.Length == 0) ip = "192.0.2.34";
+        return "session        : cccccccc-0000-0000-0000-000000000003\n" +
+               "session-id     : 7\nuser-name      : Пользователь 2\nhost           : \n" +
+               "app-id         : 1CV8C\ninfobase       : 11111111-1111-1111-1111-111111111111\n" +
+               "connection     : 00000000-0000-0000-0000-000000000000\n" +
+               "process        : 00000000-0000-0000-0000-000000000000\n" +
+               "started-at     : 2026-11-27T12:20:03\nlast-active-at : 2026-11-28T03:06:08\n" +
+               "hibernate      : yes\nclient-ip      : " + ip + "\n\n";
+    }
+
+    private static string _sessionBody = SessionNoLic;
+
     private static int Main(string[] args)
     {
         string a = string.Join(" ", args);
         string mode = Environment.GetEnvironmentVariable("RACSTUB_MODE");
         if (string.IsNullOrEmpty(mode)) mode = "open";
-        bool open = string.Equals(mode, "open", StringComparison.OrdinalIgnoreCase);
+        bool sleep = string.Equals(mode, "sleep", StringComparison.OrdinalIgnoreCase);
+        bool open = string.Equals(mode, "open", StringComparison.OrdinalIgnoreCase) || sleep;
+        _sessionBody = sleep ? SleepySession() : (open ? SessionNoLic : SessionLic);
 
         bool asAdmin = a.IndexOf("--cluster-user=\"rac_admin\"", StringComparison.Ordinal) >= 0 ||
                        a.IndexOf("--cluster-user=rac_admin", StringComparison.Ordinal) >= 0;
@@ -136,7 +160,7 @@ internal static class RacStub
                 if (a.IndexOf("11111111-1111", StringComparison.Ordinal) >= 0)
                 {
                     if (a.IndexOf("--licenses", StringComparison.Ordinal) >= 0 && open) { Write(SessionLicenseOnly); return 0; }
-                    Write(open ? SessionNoLic : SessionLic);
+                    Write(_sessionBody);
                 }
                 else Write("");
                 return 0;
@@ -144,7 +168,7 @@ internal static class RacStub
             if (needAdmin) Fail("Администратор кластера не аутентифицирован");
             // Главная особенность живого сервера: с --licenses успешный, но пустой ответ.
             if (open && a.IndexOf("--licenses", StringComparison.Ordinal) >= 0) { Write(SessionLicenseOnly); return 0; }
-            Write(open ? SessionNoLic : SessionLic);
+            Write(_sessionBody);
             return 0;
         }
 
