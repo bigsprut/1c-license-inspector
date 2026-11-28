@@ -23,9 +23,14 @@ if not exist "%WORKER%" (
 )
 
 echo Queue     : %ROOT%\queue\all
+rem PowerShell 1.0 ?? ????? -ExecutionPolicy: ????????? ????? ?????? ?????????????.
+set "PSFLAGS=-NoProfile -ExecutionPolicy Bypass"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "exit 0" >nul 2>&1
+if errorlevel 1 set "PSFLAGS=-NoProfile"
+echo Flags     : %PSFLAGS%
 echo Keep this window open. Close it to stop the worker.
 echo.
-powershell -NoProfile -ExecutionPolicy Bypass -File "%WORKER%" -Name all -Root "%ROOT%"
+powershell %PSFLAGS% -File "%WORKER%" -Name all -Root "%ROOT%"
 echo.
 echo Worker stopped.
 pause
