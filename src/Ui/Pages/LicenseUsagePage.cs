@@ -257,20 +257,15 @@ namespace OneCLicenseInspector.Ui
                 return string.Compare(a.User ?? "", b.User ?? "", StringComparison.OrdinalIgnoreCase);
             });
 
-            // Столбцы «Срок действия» и «Выдана сервером» показываем только когда данные есть:
+            // Столбцы «Срок действия» и «Выдана сервером» показываем всегда, когда есть лицензии:
             // у 8.2 срок из зашифрованного файла не читается, а «выдана сервером» rac сообщает
-            // только по сеансам. Если данные есть у части строк — у остальных честный прочерк,
-            // иначе пустые клетки читались бы как «нет срока» и «не выдана».
-            bool anyExpires = false, anyIssued = false;
+            // только по сеансам. Неизвестное значение — прочерк плюс пояснение в подсказке,
+            // а не пустая клетка (раньше из-за пустого поля писалось «нет» — это было неверно).
+            int expUnknown = 0, issUnknown = 0;
             foreach (LicenceRow lr in licences)
             {
-                if (!string.IsNullOrEmpty(lr.Expires)) anyExpires = true;
-                if (!string.IsNullOrEmpty(lr.IssuedByServer)) anyIssued = true;
-            }
-            foreach (LicenceRow lr in licences)
-            {
-                if (anyExpires && string.IsNullOrEmpty(lr.Expires)) lr.Expires = "—";
-                if (anyIssued && string.IsNullOrEmpty(lr.IssuedByServer)) lr.IssuedByServer = "—";
+                if (string.IsNullOrEmpty(lr.Expires)) { lr.Expires = "—"; expUnknown++; }
+                if (string.IsNullOrEmpty(lr.IssuedByServer)) { lr.IssuedByServer = "—"; issUnknown++; }
             }
 
             _licenceItems = licences;
@@ -297,6 +292,14 @@ namespace OneCLicenseInspector.Ui
                 if (string.IsNullOrEmpty(row.Host) && !string.IsNullOrEmpty(row.Ip)) ipOnly++;
             }
             if (ipOnly > 0) hint.Add("только IP (имени 1С не отдаёт): " + ipOnly);
+            // Прочерки в новых столбцах объясняем словами: «—» значит «источник не сообщает»,
+            // а не «лицензия не выдана сервером».
+            if (licences.Count > 0 && issUnknown == licences.Count)
+                hint.Add("«выдана сервером»: источник этот признак не сообщает");
+            else if (issUnknown > 0)
+                hint.Add("«—» в «выдана сервером» — признак не сообщён");
+            if (licences.Count > 0 && expUnknown == licences.Count)
+                hint.Add("срок действия не читается: у 8.2 файлы лицензий зашифрованы");
             if (r.Cluster != null && !string.IsNullOrEmpty(r.Cluster.Error)) hint.Add("кластер: " + r.Cluster.Error);
             _hint.Text = string.Join(" · ", hint.ToArray());
         }
@@ -383,6 +386,8 @@ namespace OneCLicenseInspector.Ui
         /// «Выдана сервером» rac сообщает не в файле лицензии, а в сеансах (issued-by-server).
         /// Собираем по сеансам, которые держат лицензию; ключ — цифры рег. номера.
         /// Если хоть один сеанс говорит «да», лицензия считается выданной сервером.
+        /// Пустое поле — это «неизвестно», а не «нет»: у импорта из консоли 8.2 признака нет
+        /// вовсе, и раньше из-за этого в таблице писалось «нет» (исправлено в 1.5.59).
         /// </summary>
         private static Dictionary<string, bool> IssuedMap(ScanResult r)
         {
@@ -394,7 +399,8 @@ namespace OneCLicenseInspector.Ui
                 if (pin.Length < 6) pin = CollectLicenses.Digits(Console82Import.LicensePin(se.LicenseShort));
                 if (pin.Length < 6) continue;
                 if (string.Equals(se.IssuedByServer, "да", StringComparison.OrdinalIgnoreCase)) map[pin] = true;
-                else if (!map.ContainsKey(pin)) map[pin] = false;
+                else if (string.Equals(se.IssuedByServer, "нет", StringComparison.OrdinalIgnoreCase) &&
+                         !map.ContainsKey(pin)) map[pin] = false;
             }
             return map;
         }
