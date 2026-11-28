@@ -111,14 +111,61 @@ internal static class RacStub
 
     private static string _sessionBody = SessionNoLic;
 
+    // Один сеанс в формате rac: разные наборы полей — с лицензией и без.
+    private static string SessionBlock(string id, string num, string user, string host, string ip, string app,
+        string infobase, string started, string hibernate, string series, string all, string cur, string issued)
+    {
+        StringBuilder b = new StringBuilder();
+        b.Append("session        : ").Append(id).Append('\n');
+        b.Append("session-id     : ").Append(num).Append('\n');
+        b.Append("user-name      : ").Append(user).Append('\n');
+        b.Append("host           : ").Append(host).Append('\n');
+        if (!string.IsNullOrEmpty(ip)) b.Append("client-ip      : ").Append(ip).Append('\n');
+        b.Append("app-id         : ").Append(app).Append('\n');
+        b.Append("infobase       : ").Append(infobase).Append('\n');
+        b.Append("started-at     : ").Append(started).Append('\n');
+        b.Append("last-active-at : ").Append(started).Append('\n');
+        b.Append("hibernate      : ").Append(hibernate).Append('\n');
+        if (!string.IsNullOrEmpty(series))
+        {
+            b.Append("license-type       : soft\n");
+            b.Append("series             : \"").Append(series).Append("\"\n");
+            b.Append("issued-by-server   : ").Append(issued).Append('\n');
+            b.Append("max-users-all      : ").Append(all).Append('\n');
+            b.Append("max-users-cur      : ").Append(cur).Append('\n');
+            b.Append("short-presentation : \"1С:Предприятие 8 (").Append(all).Append(")\"\n");
+        }
+        b.Append('\n');
+        return b.ToString();
+    }
+
+    // RACSTUB_MODE=many — восемь сеансов для проверки вида таблицы при 5–10 строках:
+    // две лицензии на нескольких сеансах, выданная и локальная, спящие без лицензии.
+    private static string ManySessions()
+    {
+        const string ib1 = "11111111-1111-1111-1111-111111111111";
+        const string ib2 = "22222222-2222-2222-2222-222222222222";
+        StringBuilder b = new StringBuilder();
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000001", "11", "Пользователь 1", "PC-01", "", "1CV8C", ib1, "2026-11-28T09:00:00", "no", "1111111111", "5", "2", "yes"));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000002", "12", "Пользователь 2", "PC-02", "", "1CV8C", ib1, "2026-11-28T09:10:00", "no", "1111111111", "5", "2", "yes"));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000003", "13", "Пользователь 3", "PC-03", "", "WebClient", ib1, "2026-11-28T09:20:00", "no", "2222222222", "1", "1", "no"));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000004", "14", "Пользователь 4", "PC-04", "", "Designer", ib2, "2026-11-28T09:30:00", "no", "2222222222", "1", "1", "no"));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000005", "15", "Пользователь 5", "", "192.0.2.34", "1CV8C", ib2, "2026-11-27T22:00:00", "yes", "", "", "", ""));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000006", "16", "DefUser", "SRV", "", "BackgroundJob", ib2, "2026-11-28T09:40:00", "no", "", "", "", ""));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000007", "17", "Пользователь 6", "PC-06", "", "1CV8C", ib2, "2026-11-28T09:50:00", "no", "3333333333", "10", "4", "yes"));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000008", "18", "Пользователь 7", "", "", "1CV8C", ib1, "2026-11-27T23:30:00", "yes", "", "", "", ""));
+        return b.ToString();
+    }
+
     private static int Main(string[] args)
     {
         string a = string.Join(" ", args);
         string mode = Environment.GetEnvironmentVariable("RACSTUB_MODE");
         if (string.IsNullOrEmpty(mode)) mode = "open";
         bool sleep = string.Equals(mode, "sleep", StringComparison.OrdinalIgnoreCase);
-        bool open = string.Equals(mode, "open", StringComparison.OrdinalIgnoreCase) || sleep;
-        _sessionBody = sleep ? SleepySession() : (open ? SessionNoLic : SessionLic);
+        bool many = string.Equals(mode, "many", StringComparison.OrdinalIgnoreCase);
+        bool open = string.Equals(mode, "open", StringComparison.OrdinalIgnoreCase) || sleep || many;
+        _sessionBody = many ? ManySessions() : (sleep ? SleepySession() : (open ? SessionNoLic : SessionLic));
 
         bool asAdmin = a.IndexOf("--cluster-user=\"rac_admin\"", StringComparison.Ordinal) >= 0 ||
                        a.IndexOf("--cluster-user=rac_admin", StringComparison.Ordinal) >= 0;
@@ -148,6 +195,9 @@ internal static class RacStub
         if (a.IndexOf("session info", StringComparison.Ordinal) >= 0)
         {
             // Режим open: в списке лицензии не отдаются, а по одному сеансу — да.
+            // В режиме many лицензии уже есть в строках сеансов, и «добор» по одному сеансу
+            // не должен придумывать лицензию спящим — иначе таблица покажет неправду.
+            if (many) return 0;
             Write(SessionLic);
             return 0;
         }
@@ -179,6 +229,13 @@ internal static class RacStub
                   "started-at : 2026-11-27T18:00:00\nexpired-timeout : 60\n" +
                   "capacity : 37\navailable-perfomance : 88\nmemory-size : 524288000\n" +
                   "host : ALL\nport : 1560\nconnections : 3\n");
+            if (many)
+            {
+                Write("process : bbbbbbbb-0000-0000-0000-000000000002\npid     : 5124\nrunning : yes\n" +
+                      "started-at : 2026-11-28T08:00:00\nexpired-timeout : 60\n" +
+                      "capacity : 12\navailable-perfomance : 100\nmemory-size : 268435456\n" +
+                      "host : ALL\nport : 1561\nconnections : 5\n");
+            }
             return 0;
         }
 

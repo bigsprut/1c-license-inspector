@@ -384,7 +384,7 @@ namespace OneCLicenseInspector
                         string kind, pin; int used, total;
                         Console82Import.ParseLicense(s.LicenseShort, out kind, out pin, out used, out total);
                         b.AppendLine("<tr><td><b>" + H(s.User) + "</b></td><td>" + H(s.Host) +
-                                    "</td><td>" + H(s.AppId) + "</td><td class=\"muted\">" + H(ShortId(s.Infobase)) + "</td><td>" + H(s.StartedAt) +
+                                    "</td><td>" + H(Fmt.AppName(s.AppId)) + "</td><td class=\"muted\">" + H(ShortId(s.Infobase)) + "</td><td>" + H(s.StartedAt) +
                                     "</td><td>" + H(kind) + "</td><td>" + H(pin) + "</td><td>" + H(used >= 0 ? used.ToString() : "") +
                                     "</td><td>" + H(total >= 0 ? total.ToString() : "") + "</td></tr>");
                     }
@@ -423,7 +423,7 @@ namespace OneCLicenseInspector
                     if (!string.IsNullOrEmpty(s.MaxUsersAll)) seats = seats + " / " + s.MaxUsersAll;
                     b.AppendLine("<tr><td><b>" + H(s.User.Length == 0 ? "(не определён)" : s.User) + "</b></td><td>" + H(s.Host) +
                                 (anyIp ? "</td><td class=\"muted\">" + H(CollectCluster.NormalizeIp(s.ClientIp)) : "") +
-                                "</td><td>" + H(s.AppId) + "</td><td class=\"muted\">" + H(ShortId(s.Infobase)) + "</td><td>" + H(s.StartedAt) +
+                                "</td><td>" + H(Fmt.AppName(s.AppId)) + "</td><td class=\"muted\">" + H(ShortId(s.Infobase)) + "</td><td>" + H(s.StartedAt) +
                                 "</td><td>" + H(lic) + "</td><td>" + H(seats) + "</td></tr>");
                 }
                 b.AppendLine("</table>");

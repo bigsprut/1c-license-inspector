@@ -55,32 +55,39 @@ namespace OneCLicenseInspector.Ui
             _licences.Columns.Add(Col("Мест", "Seats", 70));
             _licences.Columns.Add(Col("Занято", "Used", 80));
             _licences.Columns.Add(Col("Свободно", "Free", 90));
+            DataGridViewColumn expiresCol = Col("Срок действия", "Expires", 110);
+            expiresCol.ToolTipText = "Из файла лицензии (*.lic). «Бессрочно» — в файле написано «не ограничен». " +
+                                     "У лицензий 8.2 срок снаружи не читается: файлы зашифрованы.";
+            _licences.Columns.Add(expiresCol);
+            DataGridViewColumn issuedCol = Col("Выдана сервером", "IssuedByServer", 95);
+            issuedCol.ToolTipText = "Признак из rac (issued-by-server) по сеансам, которые держат эту лицензию: " +
+                                    "«да» — лицензию выдал сервер лицензий, «нет» — локальная. «—» — данных нет.";
+            _licences.Columns.Add(issuedCol);
             _licences.Columns.Add(Col("Источник", "Source", 150));
             _licences.Columns.Add(Col("Файл", "File", 260));
             _licencesRow = AddRow(WithTitle("Лицензии: регистрационный номер, мест и занято", Card(_licences, new Padding(1))), 150);
             AddSpacer(6);
 
             _sessions = MakeGrid();
-            _sessions.Columns.Add(Col("Рег. номер", "Pin", 115));
-            _sessions.Columns.Add(Col("Пользователь", "User", 130));
-            _sessions.Columns.Add(Col("Компьютер", "Host", 110));
+            _sessions.Columns.Add(Col("Рег. номер", "Pin", 95));
+            _sessions.Columns.Add(Col("Пользователь", "User", 145));
+            _sessions.Columns.Add(Col("Компьютер", "Host", 100));
             DataGridViewColumn ipCol = Col("IP", "Ip", 95);
             ipCol.ToolTipText = "Адрес клиента из rac (client-ip). У спящего сеанса 1С не отдаёт имя " +
                                 "компьютера вообще, поэтому адрес — единственное, что известно о машине.";
             _sessions.Columns.Add(ipCol);
-            _sessions.Columns.Add(Col("Инф. база", "Infobase", 120));
+            _sessions.Columns.Add(Col("Инф. база", "Infobase", 100));
             _sessions.Columns.Add(Col("№", "Number", 60));
-            _sessions.Columns.Add(Col("Начало", "Started", 120));
-            _sessions.Columns.Add(Col("Активность", "Activity", 120));
-            _sessions.Columns.Add(Col("Приложение", "App", 105));
-            _sessions.Columns.Add(Col("Состояние", "State", 80));
-            _sessions.Columns.Add(Col("Лицензия", "Licence", 110));
-            DataGridViewColumn seatsCol = Col("Мест", "Seats", 65);
-            seatsCol.ToolTipText = "Сколько мест в самой лицензии (ёмкость), а не сколько занято.";
+            _sessions.Columns.Add(Col("Начало", "Started", 100));
+            _sessions.Columns.Add(Col("Приложение", "App", 120));
+            _sessions.Columns.Add(Col("Состояние", "State", 90));
+            // Тип лицензии не дублируем (он в таблице лицензий выше), а «активность» перенесли
+            // в карточку сеанса на странице «Использование»: 11 столбцов при 5–10 сеансах
+            // не помещались, и подписи обрезались до «Пользовате…».
+            DataGridViewColumn seatsCol = Col("Мест / занято", "SeatsBusy", 90);
+            seatsCol.ToolTipText = "Слева — ёмкость лицензии, справа — сколько сеансов держат её сейчас. " +
+                                   "У серверной лицензии вместо числа «сервер»: её занимает работающий сервер, а не сеансы.";
             _sessions.Columns.Add(seatsCol);
-            DataGridViewColumn busyCol = Col("Сеансов", "Busy", 80);
-            busyCol.ToolTipText = "Сколько сеансов держат эту лицензию сейчас. У серверной лицензии — «сервер».";
-            _sessions.Columns.Add(busyCol);
             _sessionsRow = AddRow(WithTitle("Использование лицензий сеансами", Card(_sessions, new Padding(1))), 420);
 
             _hint = new Label();
@@ -130,6 +137,7 @@ namespace OneCLicenseInspector.Ui
             List<SessionRow> sessions = new List<SessionRow>();
             HashSet<string> seenPins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             int seatsTotal = 0, busyTotal = 0;
+            Dictionary<string, bool> issued = IssuedMap(r);
 
             // 1. Лицензии из консоли администрирования 8.2 — там есть места и занятость.
             foreach (License82Row row in CollectLicenses.Build82(r))
@@ -142,6 +150,7 @@ namespace OneCLicenseInspector.Ui
                 lr.Free = row.Free;
                 lr.Source = "консоль 8.2";
                 lr.File = row.File;
+                lr.IssuedByServer = IssuedText(issued, row.Pin);
                 licences.Add(lr);
                 if (row.Pin.Length > 0) seenPins.Add(row.Pin);
                 int seats, busy;
@@ -170,6 +179,8 @@ namespace OneCLicenseInspector.Ui
                 }
                 lr.Source = "файл .lic";
                 lr.File = f.FileName;
+                lr.Expires = ExpiresText(f.Expires);
+                lr.IssuedByServer = IssuedText(issued, f.Pin);
                 licences.Add(lr);
                 if (!f.IsServerLicense) seatsTotal += Math.Max(0, f.UsersNum);
                 if (!f.IsServerLicense && f.UsedBySessions > 0) busyTotal += f.UsedBySessions;
@@ -199,15 +210,13 @@ namespace OneCLicenseInspector.Ui
                     row.Number = string.IsNullOrEmpty(se.SessionNum) ? se.SessionId : se.SessionNum;
                     if (row.Number.Length > 10) row.Number = row.Number.Substring(0, 8) + "…";
                     row.Started = ShortDate(se.StartedAt);
-                    row.Activity = ShortDate(se.LastActivity);
-                    row.App = se.AppId;
+                    row.App = Fmt.AppName(se.AppId);
                     bool sleeping = string.Equals(se.Hibernate, "yes", StringComparison.OrdinalIgnoreCase);
                     row.State = string.IsNullOrEmpty(se.Hibernate) ? "" : (sleeping ? "спит" : "активен");
 
                     if (!string.IsNullOrEmpty(se.LicenseSeries) || !string.IsNullOrEmpty(se.MaxUsersAll))
                     {
                         row.Pin = se.LicenseSeries;
-                        row.Licence = string.IsNullOrEmpty(se.LicenseType) ? "программная" : se.LicenseType;
                         row.Seats = se.MaxUsersAll;
                         row.Busy = se.MaxUsersCur;
                     }
@@ -216,16 +225,10 @@ namespace OneCLicenseInspector.Ui
                         string kind, pin, file; int used, total;
                         Console82Import.ParseLicenseFull(se.LicenseShort, out kind, out pin, out used, out total, out file);
                         row.Pin = pin;
-                        row.Licence = kind;
                         row.Seats = total > 0 ? total.ToString() : "";
                         row.Busy = used >= 0 ? used.ToString() : "";
                         if (row.Number.Length == 0) row.Number = se.SessionId;
                     }
-                    else
-                    {
-                        row.Licence = sleeping ? "не выдана (спит)" : "—";
-                    }
-                    if (sleeping && string.IsNullOrEmpty(row.Pin) && string.IsNullOrEmpty(row.Licence)) row.Licence = "не выдана (спит)";
                     string pd = CollectLicenses.Digits(row.Pin);
                     if (pd.Length >= 6)
                     {
@@ -253,6 +256,22 @@ namespace OneCLicenseInspector.Ui
             {
                 return string.Compare(a.User ?? "", b.User ?? "", StringComparison.OrdinalIgnoreCase);
             });
+
+            // Столбцы «Срок действия» и «Выдана сервером» показываем только когда данные есть:
+            // у 8.2 срок из зашифрованного файла не читается, а «выдана сервером» rac сообщает
+            // только по сеансам. Если данные есть у части строк — у остальных честный прочерк,
+            // иначе пустые клетки читались бы как «нет срока» и «не выдана».
+            bool anyExpires = false, anyIssued = false;
+            foreach (LicenceRow lr in licences)
+            {
+                if (!string.IsNullOrEmpty(lr.Expires)) anyExpires = true;
+                if (!string.IsNullOrEmpty(lr.IssuedByServer)) anyIssued = true;
+            }
+            foreach (LicenceRow lr in licences)
+            {
+                if (anyExpires && string.IsNullOrEmpty(lr.Expires)) lr.Expires = "—";
+                if (anyIssued && string.IsNullOrEmpty(lr.IssuedByServer)) lr.IssuedByServer = "—";
+            }
 
             _licenceItems = licences;
             _sessionItems = sessions;
@@ -291,18 +310,18 @@ namespace OneCLicenseInspector.Ui
                          (r == null ? "" : " · " + r.System.ComputerName + " · " + Fmt.Date(r.Finished)));
             b.AppendLine();
             b.AppendLine("ЛИЦЕНЗИИ (" + _licenceItems.Count + ")");
-            b.AppendLine("Рег. номер\tТип\tМест\tЗанято\tСвободно\tИсточник\tФайл");
+            b.AppendLine("Рег. номер\tТип\tМест\tЗанято\tСвободно\tСрок действия\tВыдана сервером\tИсточник\tФайл");
             foreach (LicenceRow l in _licenceItems)
             {
-                b.AppendLine(Join(l.Pin, l.Kind, l.Seats, l.Used, l.Free, l.Source, l.File));
+                b.AppendLine(Join(l.Pin, l.Kind, l.Seats, l.Used, l.Free, l.Expires, l.IssuedByServer, l.Source, l.File));
             }
             b.AppendLine();
             b.AppendLine("ИСПОЛЬЗОВАНИЕ ЛИЦЕНЗИЙ СЕАНСАМИ (" + _sessionItems.Count + ")");
-            b.AppendLine("Рег. номер\tПользователь\tКомпьютер\tIP\tИнф. база\t№\tНачало\tАктивность\tПриложение\tСостояние\tЛицензия\tМест\tЗанято");
+            b.AppendLine("Рег. номер\tПользователь\tКомпьютер\tIP\tИнф. база\t№\tНачало\tПриложение\tСостояние\tМест / занято");
             foreach (SessionRow s in _sessionItems)
             {
-                b.AppendLine(Join(s.Pin, s.User, s.Host, s.Ip, s.Infobase, s.Number, s.Started, s.Activity,
-                                  s.App, s.State, s.Licence, s.Seats, s.Busy));
+                b.AppendLine(Join(s.Pin, s.User, s.Host, s.Ip, s.Infobase, s.Number, s.Started,
+                                  s.App, s.State, s.SeatsBusy));
             }
             return b.ToString();
         }
@@ -348,11 +367,60 @@ namespace OneCLicenseInspector.Ui
             return s.Length > 16 ? s.Substring(0, 16) : s;
         }
 
+        /// <summary>
+        /// Срок действия из файла лицензии. Платформа пишет «не ограничен» — для человека это
+        /// бессрочная лицензия, так и показываем; дату оставляем как есть.
+        /// </summary>
+        private static string ExpiresText(string raw)
+        {
+            string s = (raw ?? "").Trim();
+            if (s.Length == 0) return "";
+            if (s.ToLowerInvariant().IndexOf("не огранич", StringComparison.Ordinal) >= 0) return "бессрочно";
+            return s;
+        }
+
+        /// <summary>
+        /// «Выдана сервером» rac сообщает не в файле лицензии, а в сеансах (issued-by-server).
+        /// Собираем по сеансам, которые держат лицензию; ключ — цифры рег. номера.
+        /// Если хоть один сеанс говорит «да», лицензия считается выданной сервером.
+        /// </summary>
+        private static Dictionary<string, bool> IssuedMap(ScanResult r)
+        {
+            Dictionary<string, bool> map = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            if (r == null || r.Cluster == null) return map;
+            foreach (SessionEntry se in r.Cluster.Sessions)
+            {
+                string pin = CollectLicenses.Digits(se.LicenseSeries);
+                if (pin.Length < 6) pin = CollectLicenses.Digits(Console82Import.LicensePin(se.LicenseShort));
+                if (pin.Length < 6) continue;
+                if (string.Equals(se.IssuedByServer, "да", StringComparison.OrdinalIgnoreCase)) map[pin] = true;
+                else if (!map.ContainsKey(pin)) map[pin] = false;
+            }
+            return map;
+        }
+
+        private static string IssuedText(Dictionary<string, bool> map, string pin)
+        {
+            if (map == null) return "";
+            string d = CollectLicenses.Digits(pin);
+            if (d.Length < 6) return "";
+            bool exact;
+            if (map.TryGetValue(d, out exact)) return exact ? "да" : "нет";
+            // Рег. номер в файле — это серия плюс контрольный знак («123456789O0» против
+            // серии «123456789» в сеансе), поэтому сравниваем как в MatchUsage.
+            foreach (KeyValuePair<string, bool> kv in map)
+            {
+                if (CollectLicenses.PinMatches(kv.Key, d)) return kv.Value ? "да" : "нет";
+            }
+            return "";
+        }
+
         public class LicenceRow
         {
             public LicenceRow()
             {
-                Pin = ""; Kind = ""; Seats = ""; Used = ""; Free = ""; Source = ""; File = "";
+                Pin = ""; Kind = ""; Seats = ""; Used = ""; Free = ""; Expires = ""; IssuedByServer = "";
+                Source = ""; File = "";
             }
 
             public string Pin { get; set; }
@@ -360,6 +428,10 @@ namespace OneCLicenseInspector.Ui
             public string Seats { get; set; }
             public string Used { get; set; }
             public string Free { get; set; }
+            /// <summary>Срок действия из файла лицензии («бессрочно» или дата).</summary>
+            public string Expires { get; set; }
+            /// <summary>Признак rac issued-by-server: «да»/«нет»/«—» — данных нет.</summary>
+            public string IssuedByServer { get; set; }
             public string Source { get; set; }
             public string File { get; set; }
         }
@@ -369,7 +441,7 @@ namespace OneCLicenseInspector.Ui
             public SessionRow()
             {
                 Pin = ""; User = ""; Host = ""; Ip = ""; Infobase = ""; Number = ""; Started = "";
-                Activity = ""; App = ""; State = ""; Licence = ""; Seats = ""; Busy = "";
+                App = ""; State = ""; Seats = ""; Busy = "";
             }
 
             public string Pin { get; set; }
@@ -380,12 +452,23 @@ namespace OneCLicenseInspector.Ui
             public string Infobase { get; set; }
             public string Number { get; set; }
             public string Started { get; set; }
-            public string Activity { get; set; }
             public string App { get; set; }
             public string State { get; set; }
-            public string Licence { get; set; }
             public string Seats { get; set; }
             public string Busy { get; set; }
+            /// <summary>Столбец «Мест / занято»: ёмкость лицензии и число сеансов на ней.</summary>
+            public string SeatsBusy
+            {
+                get
+                {
+                    string s = Seats ?? "";
+                    string b = Busy ?? "";
+                    if (s.Length == 0 && b.Length == 0) return "";
+                    if (s.Length == 0) return b;
+                    if (b.Length == 0) return s;
+                    return s + " / " + b;
+                }
+            }
         }
     }
 }

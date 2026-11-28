@@ -454,7 +454,7 @@ namespace OneCLicenseInspector
             return b.ToString();
         }
 
-        private static bool PinMatches(string sessionDigits, string fileDigits)
+        internal static bool PinMatches(string sessionDigits, string fileDigits)
         {
             if (sessionDigits.Length < 6 || fileDigits.Length < 6) return false;
             if (sessionDigits == fileDigits) return true;

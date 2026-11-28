@@ -31,6 +31,29 @@ namespace OneCLicenseInspector
         }
 
         /// <summary>
+        /// Понятное название приложения: rac отдаёт технические app-id («1CV8C», «BackgroundJob»),
+        /// консоль 8.2 — уже русские строки. Незнакомое значение возвращаем как есть,
+        /// чтобы ничего не потерять.
+        /// </summary>
+        public static string AppName(string appId)
+        {
+            string s = (appId ?? "").Trim();
+            if (s.Length == 0) return "";
+            string key = s.ToLowerInvariant();
+            if (key == "1cv8c" || key == "thinclient") return "Тонкий клиент";
+            if (key == "1cv8" || key == "thickclient") return "Толстый клиент";
+            if (key == "designer") return "Конфигуратор";
+            if (key == "webclient") return "Веб-клиент";
+            if (key == "backgroundjob") return "Фон. задание";
+            if (key == "comconnection" || key == "com") return "COM-соединение";
+            if (key == "wsconnection" || key == "webservice") return "Веб-сервис";
+            if (key == "jobscheduler") return "Планировщик";
+            if (key == "srvrconsole") return "Консоль сервера";
+            if (key == "server") return "Сервер";
+            return s;
+        }
+
+        /// <summary>
         /// Список в одну строку, но не «простынёй»: первые show элементов и «и ещё N».
         /// Так длинные перечни каталогов больше не занимают полэкрана в карточках.
         /// </summary>

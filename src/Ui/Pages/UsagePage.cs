@@ -586,7 +586,7 @@ namespace OneCLicenseInspector.Ui
                 row.Host = s.Host;
                 row.ClientIp = CollectCluster.NormalizeIp(s.ClientIp);
                 row.User = string.IsNullOrEmpty(s.User) ? "—" : s.User;
-                row.AppId = s.AppId;
+                row.AppId = Fmt.AppName(s.AppId);
                 string licKind, licPin, licFile; int licUsed, licTotal;
                 Console82Import.ParseLicenseFull(s.LicenseShort, out licKind, out licPin, out licUsed, out licTotal, out licFile);
                 // 8.3 отдаёт лицензию структурными полями (тип, серия, места) — берём их,
@@ -728,10 +728,15 @@ namespace OneCLicenseInspector.Ui
                           (string.Equals(s.HostSource, "dns", StringComparison.OrdinalIgnoreCase)
                               ? " · имя компьютера получено обратным DNS"
                               : ""));
-            lines.Add("Приложение   : " + s.AppId);
+            lines.Add("Приложение   : " + Fmt.AppName(s.AppId));
             lines.Add("База         : " + s.Infobase +
                       (!string.IsNullOrEmpty(s.InfobaseId) && s.InfobaseId != s.Infobase ? " (" + s.InfobaseId + ")" : ""));
-            lines.Add("Начало       : " + s.StartedAt);
+            lines.Add("Начало       : " + ShortDate(s.StartedAt));
+            // Последняя активность — единственный признак «давно ли пользователь работал»:
+            // у спящего сеанса она заметно отличается от времени начала.
+            if (!string.IsNullOrEmpty(s.LastActivity) &&
+                !string.Equals(s.LastActivity, s.StartedAt, StringComparison.Ordinal))
+                lines.Add("Активность   : " + ShortDate(s.LastActivity));
             bool sleeping = string.Equals(s.Hibernate, "yes", StringComparison.OrdinalIgnoreCase);
             if (!string.IsNullOrEmpty(s.Hibernate))
                 lines.Add("Состояние    : " + (sleeping ? "спящий — 1С освободила клиентскую лицензию" : "активный"));
