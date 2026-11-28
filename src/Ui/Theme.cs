@@ -57,22 +57,23 @@ namespace OneCLicenseInspector.Ui
             _monoFamily = FirstInstalled(new string[] { "Consolas", "Courier New" });
         }
 
+        /// <summary>
+        /// Проверяем шрифты без InstalledFontCollection: его перечисление на серверах
+        /// может занимать секунды и подвисать. Просто пробуем создать FontFamily по имени.
+        /// </summary>
         private static string FirstInstalled(string[] names)
         {
-            try
+            foreach (string want in names)
             {
-                using (InstalledFontCollection fonts = new InstalledFontCollection())
+                try
                 {
-                    foreach (string want in names)
+                    using (FontFamily f = new FontFamily(want))
                     {
-                        foreach (FontFamily f in fonts.Families)
-                        {
-                            if (string.Equals(f.Name, want, StringComparison.OrdinalIgnoreCase)) return f.Name;
-                        }
+                        if (string.Equals(f.Name, want, StringComparison.OrdinalIgnoreCase)) return f.Name;
                     }
                 }
+                catch { }
             }
-            catch { }
             return names[names.Length - 1];
         }
 

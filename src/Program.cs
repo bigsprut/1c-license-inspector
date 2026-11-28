@@ -112,7 +112,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.5.50";
+        public const string Version = "1.5.53";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -187,23 +187,40 @@ namespace OneCLicenseInspector
                 if (Has(args, "/selftest"))
                 {
                     ScanResult r = Scanner.Run(null);
+                    Type[] pageTypes = new Type[]
+                    {
+                        typeof(Ui.OverviewPage), typeof(Ui.PlatformsPage), typeof(Ui.HardwarePage),
+                        typeof(Ui.SoftwarePage), typeof(Ui.LicenseUsagePage), typeof(Ui.UsagePage),
+                        typeof(Ui.JournalPage)
+                    };
                     List<Ui.PageBase> pages = new List<Ui.PageBase>();
-                    pages.Add(new Ui.OverviewPage());
-                    pages.Add(new Ui.PlatformsPage());
-                    pages.Add(new Ui.HardwarePage());
-                    pages.Add(new Ui.SoftwarePage());
-                    pages.Add(new Ui.LicenseUsagePage());
-                    pages.Add(new Ui.UsagePage());
-                    pages.Add(new Ui.JournalPage());
+                    for (int pi = 0; pi < pageTypes.Length; pi++)
+                    {
+                        Diag.Log("selftest: create " + pi + " " + pageTypes[pi].Name);
+                        try
+                        {
+                            pages.Add((Ui.PageBase)Activator.CreateInstance(pageTypes[pi]));
+                            Diag.Log("selftest: created " + pi);
+                        }
+                        catch (Exception ex)
+                        {
+                            Diag.Log("selftest: create FAIL " + pi + ": " + ex.GetType().Name + ": " + ex.Message);
+                            pages.Add(null);
+                        }
+                    }
+                    Diag.Log("selftest: all pages created");
                     int ok = 0, bad = 0;
                     StringBuilder log = new StringBuilder();
                     for (int i = 0; i < pages.Count; i++)
                     {
+                        if (pages[i] == null) { bad++; log.AppendLine("page " + i + ": CREATE FAIL"); continue; }
+                        Diag.Log("selftest: page " + i + " " + pages[i].GetType().Name + " start");
                         try
                         {
                             pages[i].SetSnapshot(r);
                             pages[i].CreateControl();
                             pages[i].Bind(r);
+                            Diag.Log("selftest: page " + i + " done");
                             ok++;
                             log.AppendLine("page " + i + " " + pages[i].GetType().Name + ": ok");
                         }

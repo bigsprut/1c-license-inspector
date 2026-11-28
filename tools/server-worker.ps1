@@ -104,6 +104,15 @@ function Get-AppLogPath {
     return ""
 }
 
+# Подчистить зависшие экземпляры (например, после проверки GUI в фоновом сеансе):
+# они держат локальную копию сборки и мешают её обновлять.
+try {
+    Get-Process 1cli -ErrorAction SilentlyContinue | ForEach-Object {
+        Write-Log ("снимаю зависший экземпляр: pid=" + $_.Id)
+        try { $_.Kill() } catch { }
+    }
+} catch { }
+
 Write-Log ("запуск обработчика: имя=" + $Name + ", корень=" + $Root)
 Set-Content -Path $heartbeat -Value ((Get-Date).ToString("s") + " · " + $env:COMPUTERNAME + " · " + $Name) -Encoding UTF8
 
@@ -253,6 +262,8 @@ while ($true) {
         try {
             $src = Get-AppLogPath
             if ($src -ne "") { Copy-Item $src (Join-Path $drop ("applog-" + $Name + ".log")) -Force }
+            $crash = Join-Path $env:TEMP "1c-license-inspector-crash.log"
+            if (Test-Path $crash) { Copy-Item $crash (Join-Path $drop ("crashlog-" + $Name + ".log")) -Force }
         } catch { }
 
         $body | Set-Content -Path $resultFile -Encoding UTF8
