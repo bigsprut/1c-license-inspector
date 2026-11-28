@@ -89,6 +89,9 @@ namespace OneCLicenseInspector.Ui
                                    "У серверной лицензии вместо числа «сервер»: её занимает работающий сервер, а не сеансы.";
             _sessions.Columns.Add(seatsCol);
             _sessionsRow = AddRow(WithTitle("Использование лицензий сеансами", Card(_sessions, new Padding(1))), 420);
+            // Строку сеансов делаем «растущей»: при большом окне таблица занимает всё свободное
+            // место, иначе она оставалась прежней высоты, а снизу было пусто (исправлено 1.5.60).
+            MarkGrowRow(_sessionsRow, 220);
 
             _hint = new Label();
             _hint.Dock = DockStyle.Bottom;

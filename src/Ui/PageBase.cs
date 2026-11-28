@@ -110,6 +110,47 @@ namespace OneCLicenseInspector.Ui
             {
                 int w = ClientSize.Width - Padding.Horizontal;
                 if (w > 120 && Root.Width != w) Root.Width = w;
+                ApplyGrow();
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Раньше страница всегда была «простынёй» фиксированной высоты: при увеличении окна
+        /// таблицы оставались прежнего размера, а снизу появлялось пустое место. Помеченная
+        /// этим методом строка забирает всю лишнюю высоту, поэтому длинные таблицы (сеансы,
+        /// лицензии, журнал) растут вместе с окном. Когда окно ниже содержимого — работает
+        /// как раньше: строка остаётся базовой высоты, страница прокручивается.
+        /// </summary>
+        protected void MarkGrowRow(int row, int minHeight)
+        {
+            if (row < 0 || Root == null || row >= Root.RowStyles.Count) return;
+            _growRow = row;
+            int cur = (int)Root.RowStyles[row].Height;
+            _growBase = Math.Max(minHeight > 0 ? minHeight : 0, cur);
+            _totalHeight += _growBase - cur;
+            ApplyGrow();
+        }
+
+        private int _growRow = -1;
+        private int _growBase;
+
+        private void ApplyGrow()
+        {
+            if (Root == null) return;
+            try
+            {
+                int extra = 0;
+                if (_growRow >= 0 && _growRow < Root.RowStyles.Count)
+                {
+                    int avail = ClientSize.Height - Padding.Vertical;
+                    extra = avail - _totalHeight;
+                    if (extra < 0) extra = 0;
+                    Root.RowStyles[_growRow].Height = _growBase + extra;
+                }
+                int want = _totalHeight + extra;
+                if (Root.Height != want) Root.Height = want;
+                Root.PerformLayout();
             }
             catch { }
         }
@@ -125,6 +166,7 @@ namespace OneCLicenseInspector.Ui
             c.Margin = new Padding(0);
             Root.Controls.Add(c, 0, _row);
             _row++;
+            ApplyGrow();
             return row;
         }
 
@@ -133,11 +175,15 @@ namespace OneCLicenseInspector.Ui
             try
             {
                 if (row < 0 || row >= Root.RowStyles.Count) return;
-                int old = (int)Root.RowStyles[row].Height;
-                if (old == height) return;
-                Root.RowStyles[row].Height = height;
-                Root.Height += (height - old);
+                int oldBase = (row == _growRow) ? _growBase : (int)Root.RowStyles[row].Height;
+                if (oldBase == height) return;
+                if (row == _growRow) _growBase = height;
+                else Root.RowStyles[row].Height = height;
+                // Базовая высота страницы должна учитывать изменение: иначе «растущая» строка
+                // посчитает свободное место неверно (эта ошибка была до 1.5.60).
+                _totalHeight += (height - oldBase);
                 Root.PerformLayout();
+                ApplyGrow();
             }
             catch { }
         }

@@ -76,7 +76,10 @@ namespace OneCLicenseInspector.Ui
                 _host.Controls.Add(g);
             }
             _host.Controls.Add(BuildSessionsPanel());
-            AddRow(Card(_host, new Padding(1)), 478);
+            int tabRow = AddRow(Card(_host, new Padding(1)), 478);
+            // Область вкладок забирает лишнюю высоту окна: при большом окне видно больше
+            // строк таблицы (раньше высота была жёстко 478 px при любом размере окна).
+            MarkGrowRow(tabRow, 478);
 
             _tabs.SelectedIndexChanged += delegate { if (IsHandleCreated) ShowTab(); };
             HandleCreated += delegate { ShowTab(); };
@@ -679,7 +682,7 @@ namespace OneCLicenseInspector.Ui
         {
             if (string.IsNullOrEmpty(s)) return "";
             DateTime d;
-            string[] formats = new string[] { "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy-MM-ddTHH:mm:ss" };
+            string[] formats = new string[] { "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy-MM-ddTHH:mm:ss", "dd.MM.yyyy HH:mm:ss", "dd.MM.yyyy H:mm:ss" };
             if (DateTime.TryParseExact(s.Trim(), formats, System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.None, out d))
             {
@@ -981,6 +984,9 @@ namespace OneCLicenseInspector.Ui
             _grid.Columns.Add(Col("Раздел", "Source", 90));
             _grid.Columns.Add(Col("Сообщение", "Text", 420));
             _gridRow = AddRow(Card(_grid, new Padding(1)), 470);
+            // Журнал тоже растёт вместе с окном — иначе при большом окне таблица оставалась
+            // маленькой с прокруткой внутри, а вокруг пусто (1.5.60).
+            MarkGrowRow(_gridRow, 470);
         }
 
         private DataGridViewColumn Col(string header, string prop, int weight)
