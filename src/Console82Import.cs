@@ -91,7 +91,7 @@ namespace OneCLicenseInspector
 
         /// <summary>
         /// Полная строка лицензии из консоли 8.2, например:
-        /// «Сервер, 2068, <host>, 1541, <PIN> 20 20, File://C:/.../20170330191441.lic».
+        /// «Сервер, 2068, SERVER, 1541, 0000000000 20 20, File://C:/.../20170330191441.lic».
         /// </summary>
         public static void ParseLicenseFull(string license, out string kind, out string pin, out int used, out int total, out string file)
         {
