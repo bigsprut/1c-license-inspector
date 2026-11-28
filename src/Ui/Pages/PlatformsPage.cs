@@ -89,7 +89,8 @@ namespace OneCLicenseInspector.Ui
             _grid.DataSource = rows;
             HideEmptyColumns(_grid, rows);
             SetRowHeight(_gridRow, FitGridHeight(_grid, rows.Count, 120, 420));
-            if (_items.Count > 0) _grid.Rows[0].Selected = true;
+            // именно Rows.Count: список может быть непустым, а грид ещё без строк (без окна)
+            if (_grid.Rows.Count > 0) _grid.Rows[0].Selected = true;
             ShowDetails();
         }
 

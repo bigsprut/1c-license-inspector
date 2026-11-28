@@ -185,6 +185,25 @@ while ($true) {
                     else { [void]$body.Add("ФАЙЛ НЕ ПОЯВИЛСЯ за 180 с") }
                 }
             }
+            "selftest" {
+                $err = Sync-App
+                if ($err -ne "") { [void]$body.Add($err) }
+                else {
+                    $tmpOut = Join-Path $work ("selftest-" + $id + ".txt")
+                    if (Test-Path $tmpOut) { Remove-Item $tmpOut -Force -ErrorAction SilentlyContinue }
+                    $proc = Start-App ("/selftest /selftestout:`"" + $tmpOut + "`" /silent")
+                    $ok = Wait-Path $tmpOut 180
+                    Start-Sleep -Seconds 1
+                    try { if (-not $proc.HasExited) { $proc.Kill() } } catch { }
+                    if ($ok) {
+                        $dst = Join-Path $drop ("selftest-" + $Name + "-" + $id + ".txt")
+                        Copy-Item $tmpOut $dst -Force
+                        [void]$body.Add("готово: " + $dst)
+                        foreach ($l in (Get-Content $tmpOut -Encoding UTF8)) { [void]$body.Add("  " + $l) }
+                    }
+                    else { [void]$body.Add("ФАЙЛ НЕ ПОЯВИЛСЯ за 180 с") }
+                }
+            }
             "netstat" {
                 $out = Join-Path $work "netstat.txt"
                 $rc = Run-Wait "cmd.exe" ('/c netstat -an | findstr ":1540 :1541 :1545"') $out

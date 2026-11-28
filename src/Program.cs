@@ -112,7 +112,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.5.49";
+        public const string Version = "1.5.50";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -181,6 +181,48 @@ namespace OneCLicenseInspector
                     string dump = table != null ? table : ("ERROR: " + mmcError);
                     if (!string.IsNullOrEmpty(mmcOut)) File.WriteAllText(mmcOut, dump, Encoding.UTF8);
                     return 0;
+                }
+                // /selftest — headless-проверка: собрать реальные данные, построить все страницы
+                // и проверить отрисовку без окна. Работает в фоновом сеансе (в отличие от /navtest).
+                if (Has(args, "/selftest"))
+                {
+                    ScanResult r = Scanner.Run(null);
+                    List<Ui.PageBase> pages = new List<Ui.PageBase>();
+                    pages.Add(new Ui.OverviewPage());
+                    pages.Add(new Ui.PlatformsPage());
+                    pages.Add(new Ui.HardwarePage());
+                    pages.Add(new Ui.SoftwarePage());
+                    pages.Add(new Ui.LicenseUsagePage());
+                    pages.Add(new Ui.UsagePage());
+                    pages.Add(new Ui.JournalPage());
+                    int ok = 0, bad = 0;
+                    StringBuilder log = new StringBuilder();
+                    for (int i = 0; i < pages.Count; i++)
+                    {
+                        try
+                        {
+                            pages[i].SetSnapshot(r);
+                            pages[i].CreateControl();
+                            pages[i].Bind(r);
+                            ok++;
+                            log.AppendLine("page " + i + " " + pages[i].GetType().Name + ": ok");
+                        }
+                        catch (Exception ex)
+                        {
+                            bad++;
+                            log.AppendLine("page " + i + " " + pages[i].GetType().Name + ": FAIL " + ex.GetType().Name + ": " + ex.Message);
+                        }
+                        finally { try { pages[i].Dispose(); } catch { } }
+                    }
+                    log.AppendLine("итог: ok=" + ok + ", fail=" + bad);
+                    string outPath = Arg(args, "/selftestout");
+                    if (string.IsNullOrEmpty(outPath))
+                    {
+                        outPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "1c-license-inspector-selftest.txt");
+                    }
+                    WriteText(outPath, log.ToString(), true);
+                    if (!Has(args, "/silent")) Console.WriteLine(log.ToString());
+                    System.Environment.Exit(bad == 0 ? 0 : 2);
                 }
                 string test82 = Arg(args, "/82test");
                 if (!string.IsNullOrEmpty(test82))

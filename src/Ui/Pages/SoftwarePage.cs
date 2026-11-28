@@ -253,7 +253,7 @@ namespace OneCLicenseInspector.Ui
             HideEmptyColumns(_grid, rows);
             if (_fileSection != null) _fileSection.Visible = rows.Count > 0;
             SetRowHeight(_gridRow, rows.Count > 0 ? 30 + FitGridHeight(_grid, rows.Count, 96, 300) : 0);
-            if (rows.Count > 0) _grid.Rows[0].Selected = true;
+            if (_grid.Rows.Count > 0) _grid.Rows[0].Selected = true;
             ShowDetails();
 
             // Лицензии по данным консоли 8.2: клиентские — по сеансам, серверная — «занята сервером».
