@@ -1,4 +1,4 @@
-﻿# Сборка «Инспектор лицензий 1С» компилятором .NET Framework 4.0 (csc.exe).
+# Сборка «Инспектор лицензий 1С» компилятором .NET Framework 4.0 (csc.exe).
 # Никаких внешних зависимостей: на выходе один exe, работающий на Windows Server 2003 x64
 # (при установленном .NET Framework 4.0) и на Windows Server 2016/2019/2022.
 #
@@ -80,10 +80,14 @@ try {
     if ($exit -ne 0) { throw ('Сборка не удалась, код ' + $exit) }
     if (-not (Test-Path $exeRel)) { throw 'Компилятор не создал exe.' }
 
-
+    # Одна сборка — две одинаковые копии: build\ для запуска и dist\ для релиза.
+    # Раньше они разъезжались по версиям, и можно было случайно запустить старую.
+    try { Copy-Item $exeRel 'dist\1C-License-Inspector.exe' -Force -ErrorAction Stop } catch { }
 
     $info = Get-Item $exeRel
-    Write-Host ('Готово: ' + $info.FullName + '  (' + [Math]::Round($info.Length / 1KB) + ' КБ)')
+    $ver = $info.VersionInfo.FileVersion
+    Write-Host ('Готово: ' + $info.FullName + '  (' + [Math]::Round($info.Length / 1KB) + ' КБ, версия ' + $ver + ')')
+    Write-Host ('Копия:  ' + (Join-Path $root 'dist\1C-License-Inspector.exe'))
 }
 finally {
     Pop-Location
