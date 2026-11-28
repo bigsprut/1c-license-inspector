@@ -62,43 +62,6 @@ namespace OneCLicenseInspector
             }
             if (r.Cluster != null)
             {
-                Dictionary<string, int[]> pins82 = new Dictionary<string, int[]>(StringComparer.OrdinalIgnoreCase);
-                Dictionary<string, string> files82 = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                List<SessionEntry> imported = new List<SessionEntry>();
-                imported.AddRange(r.Cluster.Sessions);
-                imported.AddRange(r.Cluster.Processes);
-                foreach (SessionEntry se in imported)
-                {
-                    if (!string.IsNullOrEmpty(se.LicenseSeries)) continue;
-                    if (string.IsNullOrEmpty(se.LicenseShort)) continue;
-                    string kind, pin, file; int used, total;
-                    Console82Import.ParseLicenseFull(se.LicenseShort, out kind, out pin, out used, out total, out file);
-                    if (pin.Length == 0 && string.IsNullOrEmpty(file)) continue;
-                    string key = pin.Length > 0 ? pin : file;
-                    int[] acc;
-                    if (!pins82.TryGetValue(key, out acc)) { acc = new int[] { 0, -1 }; pins82[key] = acc; }
-                    acc[0]++;
-                    if (total > acc[1]) acc[1] = total;
-                    if (!string.IsNullOrEmpty(file)) files82[key] = file;
-                }
-                if (pins82.Count > 0)
-                {
-                    b.AppendLine("Лицензии по данным консоли 8.2 (файлы *.lic в 8.2 зашифрованы):");
-                    foreach (KeyValuePair<string, int[]> kv in pins82)
-                    {
-                        string file;
-                        files82.TryGetValue(kv.Key, out file);
-                        b.AppendLine("  " + kv.Key + " · мест " + (kv.Value[1] > 0 ? kv.Value[1].ToString() : "—") +
-                                     " · занято " + kv.Value[0] +
-                                     " · свободно " + (kv.Value[1] > 0 ? Math.Max(0, kv.Value[1] - kv.Value[0]).ToString() : "—") +
-                                     (string.IsNullOrEmpty(file) ? "" : " · " + file));
-                    }
-                    b.AppendLine();
-                }
-            }
-
-            if (r.Cluster != null)
-            {
                 ClusterInfo c = r.Cluster;
                 b.AppendLine("Кластер: доступен=" + c.Available + " endpoint=" + c.Endpoint +
                              " процессов=" + c.Processes.Count + " сеансов=" + c.Sessions.Count);

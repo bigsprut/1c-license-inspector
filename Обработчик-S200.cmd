@@ -2,28 +2,37 @@
 setlocal
 title License inspector worker - s200
 
-rem C# worker: no PowerShell dependency (Server 2003 has PowerShell 1.0, where the
-rem PS version of the worker cannot run at all).
 set "ROOT=%~dp0"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 if not exist "%ROOT%\build\Worker.exe" set "ROOT=\\tsclient\D\work\Learn\DSHarness\1CCommon"
-set "WORKER=%ROOT%\build\Worker.exe"
+set "SRC=%ROOT%\build\Worker.exe"
 
 echo Host      : %COMPUTERNAME%
 echo Project   : %ROOT%
-echo Worker    : %WORKER%
+echo Worker    : %SRC%
 echo Queue     : %ROOT%\queue\s200
 echo.
 
-if not exist "%WORKER%" (
+if not exist "%SRC%" (
   echo [ERROR] build\Worker.exe not found.
   echo         Run this file from \\tsclient\D\work\Learn\DSHarness\1CCommon
   pause
   exit /b 1
 )
 
+rem Run a LOCAL copy: an exe started from a network path locks the file on the host,
+rem which then cannot be rebuilt. Copying also avoids UNC load problems on Server 2003.
+set "LOCALDIR=%TEMP%\1c-inspector-worker"
+if not exist "%LOCALDIR%" mkdir "%LOCALDIR%"
+copy /Y "%SRC%" "%LOCALDIR%\Worker.exe" >nul
+if errorlevel 1 (
+  echo [ERROR] cannot copy Worker.exe to %LOCALDIR%
+  pause
+  exit /b 1
+)
+
 echo Keep this window open. Close it to stop the worker.
-"%WORKER%" s200 "%ROOT%"
+"%LOCALDIR%\Worker.exe" s200 "%ROOT%"
 echo.
 echo Worker stopped.
 pause

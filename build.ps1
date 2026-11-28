@@ -49,10 +49,22 @@ try {
     $exeRel = 'build\1C-License-Inspector.exe'
     if (Test-Path $exeRel) { Remove-Item $exeRel -Force }
 
-    # Обработчик очереди для удалённого тестирования (C#, без PowerShell)
+    # Обработчик очереди для удалённого тестирования (C#, без PowerShell).
+    # Собираем во временный файл: build\Worker.exe может быть занят запущенным на сервере
+    # обработчиком (он берёт exe по UNC-пути) — тогда просто оставляем прежний.
     if (Test-Path 'tools\Worker.cs') {
-        & $csc /nologo /target:exe /platform:anycpu /optimize+ /codepage:65001 /out:build\Worker.exe tools\Worker.cs
-        if ($LASTEXITCODE -ne 0) { throw 'Не удалось собрать Worker.exe' }
+        $tmpWorker = 'build\Worker.new.exe'
+        & $csc /nologo /target:exe /platform:anycpu /optimize+ /codepage:65001 /out:$tmpWorker tools\Worker.cs
+        if ($LASTEXITCODE -eq 0 -and (Test-Path $tmpWorker)) {
+            try {
+                Move-Item $tmpWorker 'build\Worker.exe' -Force -ErrorAction Stop
+            } catch {
+                Write-Host 'ВНИМАНИЕ: build\Worker.exe занят (обработчик запущен на сервере) — оставляю прежний.'
+                Remove-Item $tmpWorker -Force -ErrorAction SilentlyContinue
+            }
+        } else {
+            throw 'Не удалось собрать Worker.exe'
+        }
     }
 
     # 32-битный помощник (встраивается в приложение ресурсом)
