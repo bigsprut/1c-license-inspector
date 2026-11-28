@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -31,17 +32,23 @@ namespace OneCLicenseInspector.Ui
         private ScanResult _result;
         private List<SessionEntry> _sessionItems = new List<SessionEntry>();
 
+        // Вкладка «Нагрузка» (1.7.0): счётчики rac — кто сжигает процессор и тянет данные из СУБД.
+        private Panel _loadPanel;
+        private DataGridView _loads;
+        private Label _loadHint;
+
         public UsagePage()
         {
-            AddHeader("Использование", "Процессы 1С, службы защиты, порты и сеансы с выданными лицензиями");
+            AddHeader("Использование", "Процессы 1С, службы защиты, порты, сеансы с лицензиями и нагрузка по данным rac");
 
             _tabs = new SegmentedTabs();
             _tabs.Items.Add("Процессы");
             _tabs.Items.Add("Службы");
             _tabs.Items.Add("Порты");
             _tabs.Items.Add("Сеансы и лицензии");
+            _tabs.Items.Add("Нагрузка");
             _tabs.Height = 42;
-            _tabs.SelectedIndex = Math.Max(0, Math.Min(3, Program.InitialUsageTab));
+            _tabs.SelectedIndex = Math.Max(0, Math.Min(4, Program.InitialUsageTab));
             AddRow(_tabs, 44);
             AddSpacer(4);
 
@@ -76,6 +83,7 @@ namespace OneCLicenseInspector.Ui
                 _host.Controls.Add(g);
             }
             _host.Controls.Add(BuildSessionsPanel());
+            _host.Controls.Add(BuildLoadPanel());
             int tabRow = AddRow(Card(_host, new Padding(1)), 478);
             // Область вкладок забирает лишнюю высоту окна: при большом окне видно больше
             // строк таблицы (раньше высота была жёстко 478 px при любом размере окна).
@@ -210,9 +218,25 @@ namespace OneCLicenseInspector.Ui
             _sessDetails.BackColor = Color.FromArgb(250, 251, 252);
             _sessDetails.ForeColor = Theme.InkSoft;
             _sessDetails.Font = Theme.MonoFont(8.5f);
-            _sessDetails.Dock = DockStyle.Bottom;
-            _sessDetails.Height = 96;
+            _sessDetails.Dock = DockStyle.Fill;
             EnableCopy(_sessDetails);
+
+            // Карточка сеанса в своей панели: сверху отступ и тонкая линия-разделитель,
+            // иначе первая строка карточки прилипала к последней строке таблицы и читалась
+            // как её продолжение (заметно, когда в карточке появился блок нагрузки).
+            Panel detailsHost = new Panel();
+            detailsHost.Dock = DockStyle.Bottom;
+            // 172 px: в карточку добавился блок нагрузки (1.7.0) — при прежних 96 он уходил
+            // под прокрутку, и его никто бы не увидел.
+            detailsHost.Height = 176;
+            detailsHost.BackColor = Color.White;
+            detailsHost.Padding = new Padding(0, 9, 0, 0);
+            detailsHost.Controls.Add(_sessDetails);
+            detailsHost.Paint += delegate(object sender, PaintEventArgs e)
+            {
+                using (Pen pen = new Pen(Theme.Line))
+                    e.Graphics.DrawLine(pen, 0, 4, detailsHost.Width, 4);
+            };
 
             _procs = MakeGrid();
             _procs.Columns.Add(Col("Компьютер", "Computer", 100));
@@ -275,10 +299,145 @@ namespace OneCLicenseInspector.Ui
             _sessPanel.Controls.Add(_sessTitle);
             _sessPanel.Controls.Add(_procs);
             _sessPanel.Controls.Add(_procsTitle);
-            _sessPanel.Controls.Add(_sessDetails);
+            _sessPanel.Controls.Add(detailsHost);
             _sessPanel.Controls.Add(_sessHint);
             _sessPanel.Controls.Add(top);
             return _sessPanel;
+        }
+
+        /// <summary>
+        /// Вкладка «Нагрузка» (1.7.0): счётчики rac по сеансам — продолжительность вызовов,
+        /// процессорное время и объём данных из СУБД. Отдельной вкладкой, а не столбцами
+        /// в «Сеансах»: там и без них десять столбцов, а нагрузку смотрят списком, отсортированным
+        /// по продолжительности, — сверху тот, кто действительно греет сервер.
+        /// </summary>
+        private Panel BuildLoadPanel()
+        {
+            _loadPanel = new Panel();
+            _loadPanel.Dock = DockStyle.Fill;
+            _loadPanel.BackColor = Color.White;
+            _loadPanel.Visible = false;
+
+            _loads = MakeGrid();
+            _loads.Columns.Add(Col("Инф. база", "Infobase", 105));
+            _loads.Columns.Add(Col("Пользователь", "User", 118));
+            _loads.Columns.Add(Col("Компьютер", "Host", 95));
+            _loads.Columns.Add(Col("Приложение", "AppId", 100));
+            _loads.Columns.Add(Col("Состояние", "State", 74));
+            // Заголовок «Длительность», а не «Продолжительность»: полное слово не влезает
+            // в столбец и обрезается до «Продолжительн…», а смысл тот же.
+            DataGridViewColumn dur = Col("Длительность", "Duration", 100);
+            dur.ToolTipText = "Суммарная длительность вызовов сеанса с его начала (rac: duration-all).\r\n" +
+                              "Сколько из этого времени ушло в СУБД и в код 1С — в карточке сеанса на вкладке «Сеансы и лицензии».";
+            _loads.Columns.Add(dur);
+            _loads.Columns.Add(Col("Вызовов", "Calls", 66));
+            _loads.Columns.Add(Col("мс/вызов", "PerCall", 72));
+            DataGridViewColumn cpu = Col("CPU", "Cpu", 72);
+            cpu.ToolTipText = "Процессорное время вызовов сеанса (rac: cpu-time-total).";
+            _loads.Columns.Add(cpu);
+            DataGridViewColumn db = Col("БД", "DbmsBytes", 88);
+            db.ToolTipText = "Объём данных, прочитанных из СУБД и записанных в неё (rac: dbms-bytes-all).";
+            _loads.Columns.Add(db);
+            _loads.Dock = DockStyle.Fill;
+
+            _loadHint = new Label();
+            _loadHint.Dock = DockStyle.Bottom;
+            _loadHint.Height = 46;
+            _loadHint.Padding = new Padding(10, 4, 10, 4);
+            _loadHint.ForeColor = Theme.Muted;
+            _loadHint.Font = Theme.Small;
+            _loadHint.Text = "";
+
+            Label title = new Label();
+            title.Dock = DockStyle.Top;
+            title.Height = 24;
+            title.Padding = new Padding(10, 6, 10, 0);
+            title.ForeColor = Theme.Muted;
+            title.Font = Theme.Small;
+            title.Text = "Кто нагружает кластер: счётчики rac с начала сеанса, сверху — самые долгие";
+
+            _loadPanel.Controls.Add(_loads);
+            _loadPanel.Controls.Add(title);
+            _loadPanel.Controls.Add(_loadHint);
+            return _loadPanel;
+        }
+
+        /// <summary>
+        /// Заполняет вкладку «Нагрузка». Сеансы без счётчиков (8.2, старый rac) не выдумываем:
+        /// если показателей нет ни у кого — честно пишем, что кластер их не отдал.
+        /// </summary>
+        private void BindLoad(ClusterInfo c)
+        {
+            if (_loads == null) return;
+            List<SessionEntry> items = new List<SessionEntry>();
+            int sessions = 0;
+            if (c != null && c.Sessions != null)
+            {
+                sessions = c.Sessions.Count;
+                foreach (SessionEntry s in c.Sessions) if (s.HasLoad) items.Add(s);
+            }
+            // Сверху — самые «долгие» сеансы; при равенстве смотрим на процессор.
+            items.Sort(delegate(SessionEntry a, SessionEntry b)
+            {
+                long x = a.DurationAllMs >= 0 ? a.DurationAllMs : 0;
+                long y = b.DurationAllMs >= 0 ? b.DurationAllMs : 0;
+                if (y != x) return y.CompareTo(x);
+                long cx = a.CpuTimeMs >= 0 ? a.CpuTimeMs : 0;
+                long cy = b.CpuTimeMs >= 0 ? b.CpuTimeMs : 0;
+                return cy.CompareTo(cx);
+            });
+
+            List<LoadRow> rows = new List<LoadRow>();
+            long sumDur = 0, sumCpu = 0, sumCalls = 0, sumDb = 0;
+            foreach (SessionEntry s in items)
+            {
+                LoadRow row = new LoadRow();
+                row.Infobase = ShortInfobase(s.Infobase);
+                row.User = string.IsNullOrEmpty(s.User) ? "—" : s.User;
+                row.Host = string.IsNullOrEmpty(s.Host) ? "—" : s.Host;
+                row.AppId = Fmt.AppName(s.AppId);
+                row.State = string.Equals(s.Hibernate, "yes", StringComparison.OrdinalIgnoreCase) ? "спит" : "активен";
+                row.Duration = s.DurationAllMs >= 0 ? Fmt.Clock(s.DurationAllMs) : "";
+                row.Calls = s.CallsAll >= 0 ? Fmt.N(Clamp(s.CallsAll)) : "";
+                row.PerCall = s.CallsAll > 0 && s.DurationAllMs >= 0 ? Fmt.N(Clamp(s.DurationAllMs / s.CallsAll)) : "";
+                row.Cpu = s.CpuTimeMs >= 0 ? Fmt.Clock(s.CpuTimeMs) : "";
+                row.DbmsBytes = s.DbmsBytesAll >= 0 ? Fmt.Bytes(s.DbmsBytesAll) : "";
+                rows.Add(row);
+                if (s.DurationAllMs > 0) sumDur += s.DurationAllMs;
+                if (s.CpuTimeMs > 0) sumCpu += s.CpuTimeMs;
+                if (s.CallsAll > 0) sumCalls += s.CallsAll;
+                if (s.DbmsBytesAll > 0) sumDb += s.DbmsBytesAll;
+            }
+            _loads.DataSource = null;
+            _loads.DataSource = rows;
+            HideEmptyColumns(_loads, rows);
+
+            if (rows.Count == 0)
+            {
+                if (sessions > 0)
+                    _loadHint.Text = "Кластер не отдал счётчики нагрузки: поля duration-all, cpu-time-total и dbms-bytes-all " +
+                                     "появились в 1С 8.3 (у 8.2 их нет вовсе). Сеансы и лицензии — на вкладке «Сеансы и лицензии».";
+                else
+                    _loadHint.Text = "Сеансов нет — нагрузки тоже. Счётчики rac появляются, когда в кластере есть к кому подключиться.";
+                return;
+            }
+
+            StringBuilder hint = new StringBuilder();
+            hint.Append("Сеансов: ").Append(rows.Count);
+            if (sumCalls > 0) hint.Append(" · вызовов: ").Append(Fmt.N(Clamp(sumCalls)));
+            if (sumDur > 0) hint.Append(" · продолжительность: ").Append(Fmt.Clock(sumDur));
+            if (sumCpu > 0) hint.Append(" · CPU: ").Append(Fmt.Clock(sumCpu));
+            if (sumDb > 0) hint.Append(" · данные СУБД: ").Append(Fmt.Bytes(sumDb));
+            if (c != null && !string.IsNullOrEmpty(c.Endpoint)) hint.Append(" · ").Append(c.Endpoint);
+            if (sessions > items.Count) hint.Append(" · без счётчиков: ").Append(sessions - items.Count);
+            hint.Append("\r\nПродолжительность и CPU — по данным rac; «мс / вызов» — среднее время одного вызова за время сеанса.");
+            _loadHint.Text = hint.ToString();
+        }
+
+        private static int Clamp(long v)
+        {
+            if (v < 0) return 0;
+            return v > int.MaxValue ? int.MaxValue : (int)v;
         }
 
 
@@ -325,6 +484,12 @@ namespace OneCLicenseInspector.Ui
             bool sessions = _tabs.SelectedIndex == 3;
             _sessPanel.Visible = sessions;
             if (sessions) _sessPanel.BringToFront();
+            bool load = _tabs.SelectedIndex == 4;
+            if (_loadPanel != null)
+            {
+                _loadPanel.Visible = load;
+                if (load) _loadPanel.BringToFront();
+            }
             ShowGrid(_processes, _tabs.SelectedIndex == 0);
             ShowGrid(_services, _tabs.SelectedIndex == 1);
             ShowGrid(_ports, _tabs.SelectedIndex == 2);
@@ -666,6 +831,7 @@ namespace OneCLicenseInspector.Ui
                 }
             }
             ShowSessionDetails();
+            BindLoad(c);
         }
 
 
@@ -899,6 +1065,25 @@ namespace OneCLicenseInspector.Ui
                     return s + " / " + b;
                 }
             }
+        }
+
+        /// <summary>
+        /// Строка вкладки «Нагрузка». Значения — уже готовые строки (как и в остальных таблицах
+        /// приложения): таблица привязана к List, а не к сортируемому источнику, а порядок
+        /// по умолчанию задаём сами — от самого долгого сеанса к самому короткому.
+        /// </summary>
+        public class LoadRow
+        {
+            public string Infobase { get; set; }
+            public string User { get; set; }
+            public string Host { get; set; }
+            public string AppId { get; set; }
+            public string State { get; set; }
+            public string Duration { get; set; }
+            public string Calls { get; set; }
+            public string PerCall { get; set; }
+            public string Cpu { get; set; }
+            public string DbmsBytes { get; set; }
         }
 
         public class ProcessRow

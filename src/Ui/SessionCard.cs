@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace OneCLicenseInspector.Ui
 {
@@ -36,6 +37,35 @@ namespace OneCLicenseInspector.Ui
             bool sleeping = string.Equals(s.Hibernate, "yes", StringComparison.OrdinalIgnoreCase);
             if (!string.IsNullOrEmpty(s.Hibernate))
                 lines.Add("Состояние    : " + (sleeping ? "спящий — 1С освободила клиентскую лицензию" : "активный"));
+            // Нагрузка (1.7.0) — сразу после «кто/где/состояние», до лицензионных строк:
+            // счётчики rac отвечают на вопрос «кто реально работает», и они не должны
+            // уезжать под прокрутку в самом низу карточки.
+            bool hasLoad = s.CallsAll >= 0 || s.DurationAllMs >= 0 || s.CpuTimeMs >= 0 ||
+                           s.DurationDbmsMs >= 0 || s.DurationServiceMs >= 0 || s.DbmsBytesAll >= 0 || s.BytesAll >= 0;
+            if (hasLoad) lines.Add("");
+            if (s.CallsAll >= 0 || s.DurationAllMs >= 0 || s.CpuTimeMs >= 0)
+            {
+                List<string> load = new List<string>();
+                if (s.CallsAll >= 0) load.Add("вызовов " + s.CallsAll.ToString(CultureInfo.InvariantCulture));
+                if (s.DurationAllMs >= 0) load.Add("продолжительность " + Fmt.Clock(s.DurationAllMs));
+                if (s.CpuTimeMs >= 0) load.Add("CPU " + Fmt.Clock(s.CpuTimeMs));
+                lines.Add("Нагрузка     : " + string.Join(" · ", load.ToArray()));
+            }
+            if (s.DurationDbmsMs >= 0 || s.DurationServiceMs >= 0)
+            {
+                List<string> where = new List<string>();
+                if (s.DurationDbmsMs >= 0) where.Add("в СУБД " + Fmt.Clock(s.DurationDbmsMs));
+                if (s.DurationServiceMs >= 0) where.Add("в коде 1С " + Fmt.Clock(s.DurationServiceMs));
+                lines.Add("Из вызовов   : " + string.Join(" · ", where.ToArray()));
+            }
+            if (s.DbmsBytesAll >= 0 || s.BytesAll >= 0)
+            {
+                List<string> data = new List<string>();
+                if (s.DbmsBytesAll >= 0) data.Add("СУБД " + Fmt.Bytes(s.DbmsBytesAll));
+                if (s.BytesAll >= 0) data.Add("клиенту " + Fmt.Bytes(s.BytesAll));
+                lines.Add("Данные       : " + string.Join(" · ", data.ToArray()));
+            }
+            if (hasLoad) lines.Add("");
             if (!string.IsNullOrEmpty(s.LicenseType)) lines.Add("Тип лицензии : " + s.LicenseType);
             if (!string.IsNullOrEmpty(s.LicenseSeries)) lines.Add("Серия        : " + s.LicenseSeries);
             if (!string.IsNullOrEmpty(s.LicenseFullName)) lines.Add("Продукт      : " + s.LicenseFullName);

@@ -63,7 +63,8 @@ namespace OneCLicenseInspector.Lite
             _details.Text = "Выберите сеанс в таблице — ниже появятся подробности.";
             EnableCopy(_details);
             card.Controls.Add(_details);
-            AddRow(card, 132);
+            // 186 px: в карточке появился блок нагрузки (1.7.0), при прежних 132 он обрезался.
+            AddRow(card, 186);
 
             _hint = new Label();
             _hint.Dock = DockStyle.Bottom;

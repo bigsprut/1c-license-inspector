@@ -70,7 +70,9 @@ internal static class RacStub
         "session        : aaaaaaaa-0000-0000-0000-000000000001\n" +
         "session-id     : 3\nuser-name      : Сергей\nhost           : WORKPC\n" +
         "app-id         : 1CV8C\ninfobase       : 11111111-1111-1111-1111-111111111111\n" +
-        "started-at     : 2026-11-27T18:40:12\nhibernate      : yes\n\n";
+        "started-at     : 2026-11-27T18:40:12\nhibernate      : yes\n" +
+        "calls-all      : 886\nduration-all   : 128964\ncpu-time-total : 96890\n" +
+        "dbms-bytes-all : 140429470\nbytes-all      : 2607036\n\n";
 
     // Как на живом кластере 8.3.27: ответ с --licenses содержит только лицензионную часть,
     // без информационной базы и времени начала. Список без --licenses — полный.
@@ -106,14 +108,19 @@ internal static class RacStub
                "connection     : 00000000-0000-0000-0000-000000000000\n" +
                "process        : 00000000-0000-0000-0000-000000000000\n" +
                "started-at     : 2026-11-27T12:20:03\nlast-active-at : 2026-11-28T03:06:08\n" +
-               "hibernate      : yes\nclient-ip      : " + ip + "\n\n";
+               "hibernate      : yes\nclient-ip      : " + ip + "\n" +
+               "calls-all      : 10\nduration-all   : 800\ncpu-time-total : 300\n" +
+               "dbms-bytes-all : 90000\nbytes-all      : 12000\n\n";
     }
 
     private static string _sessionBody = SessionNoLic;
 
     // Один сеанс в формате rac: разные наборы полей — с лицензией и без.
+    // Последние пять параметров — счётчики нагрузки (1.7.0): -1 = поля в ответе нет
+    // (так отвечает 8.2 и старый rac), 0 — честный ноль.
     private static string SessionBlock(string id, string num, string user, string host, string ip, string app,
-        string infobase, string started, string hibernate, string series, string all, string cur, string issued)
+        string infobase, string started, string hibernate, string series, string all, string cur, string issued,
+        long calls, long durationMs, long cpuMs, long dbmsBytes, long clientBytes)
     {
         StringBuilder b = new StringBuilder();
         b.Append("session        : ").Append(id).Append('\n');
@@ -127,6 +134,17 @@ internal static class RacStub
         // Активные сеансы «работали» только что, спящие — когда их оставили.
         b.Append("last-active-at : ").Append(hibernate == "yes" ? started : "2026-11-28T16:55:00").Append('\n');
         b.Append("hibernate      : ").Append(hibernate).Append('\n');
+        if (calls >= 0)
+        {
+            // Как на живом 8.3.27: duration-* и cpu-time-* — миллисекунды, bytes-* — байты.
+            b.Append("bytes-all          : ").Append(clientBytes).Append('\n');
+            b.Append("calls-all          : ").Append(calls).Append('\n');
+            b.Append("dbms-bytes-all     : ").Append(dbmsBytes).Append('\n');
+            b.Append("duration-all       : ").Append(durationMs).Append('\n');
+            b.Append("duration-all-dbms  : ").Append(durationMs / 4).Append('\n');
+            b.Append("duration-all-service : ").Append(durationMs / 20).Append('\n');
+            b.Append("cpu-time-total     : ").Append(cpuMs).Append('\n');
+        }
         if (!string.IsNullOrEmpty(series))
         {
             b.Append("license-type       : soft\n");
@@ -141,20 +159,21 @@ internal static class RacStub
     }
 
     // RACSTUB_MODE=many — восемь сеансов для проверки вида таблицы при 5–10 строках:
-    // две лицензии на нескольких сеансах, выданная и локальная, спящие без лицензии.
+    // две лицензии на нескольких сеансах, выданная и локальная, спящие без лицензии,
+    // разные счётчики нагрузки (восьмой сеанс — без них вовсе, как 8.2).
     private static string ManySessions()
     {
         const string ib1 = "11111111-1111-1111-1111-111111111111";
         const string ib2 = "22222222-2222-2222-2222-222222222222";
         StringBuilder b = new StringBuilder();
-        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000001", "11", "Пользователь 1", "PC-01", "", "1CV8C", ib1, "2026-11-28T09:00:00", "no", "1111111111", "5", "2", "yes"));
-        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000002", "12", "Пользователь 2", "PC-02", "", "1CV8C", ib1, "2026-11-28T09:10:00", "no", "1111111111", "5", "2", "yes"));
-        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000003", "13", "Пользователь 3", "PC-03", "", "WebClient", ib1, "2026-11-28T09:20:00", "no", "2222222222", "1", "1", "no"));
-        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000004", "14", "Пользователь 4", "PC-04", "", "Designer", ib2, "2026-11-28T09:30:00", "no", "2222222222", "1", "1", "no"));
-        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000005", "15", "Пользователь 5", "", "192.0.2.34", "1CV8C", ib2, "2026-11-27T22:00:00", "yes", "", "", "", ""));
-        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000006", "16", "DefUser", "SRV", "", "BackgroundJob", ib2, "2026-11-28T09:40:00", "no", "", "", "", ""));
-        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000007", "17", "Пользователь 6", "PC-06", "", "1CV8C", ib2, "2026-11-28T09:50:00", "no", "3333333333", "10", "4", "yes"));
-        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000008", "18", "Пользователь 7", "", "", "1CV8C", ib1, "2026-11-27T23:30:00", "yes", "", "", "", ""));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000001", "11", "Пользователь 1", "PC-01", "", "1CV8C", ib1, "2026-11-28T09:00:00", "no", "1111111111", "5", "2", "yes", 886, 128964, 96890, 140429470, 2607036));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000002", "12", "Пользователь 2", "PC-02", "", "1CV8C", ib1, "2026-11-28T09:10:00", "no", "1111111111", "5", "2", "yes", 120, 15400, 6400, 12400000, 900000));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000003", "13", "Пользователь 3", "PC-03", "", "WebClient", ib1, "2026-11-28T09:20:00", "no", "2222222222", "1", "1", "no", 45, 3200, 900, 2400000, 350000));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000004", "14", "Пользователь 4", "PC-04", "", "Designer", ib2, "2026-11-28T09:30:00", "no", "2222222222", "1", "1", "no", 700, 210000, 15000, 88000000, 1200000));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000005", "15", "Пользователь 5", "", "192.0.2.34", "1CV8C", ib2, "2026-11-27T22:00:00", "yes", "", "", "", "", 10, 800, 300, 90000, 12000));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000006", "16", "DefUser", "SRV", "", "BackgroundJob", ib2, "2026-11-28T09:40:00", "no", "", "", "", "", 0, 0, 0, 11738162, 0));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000007", "17", "Пользователь 6", "PC-06", "", "1CV8C", ib2, "2026-11-28T09:50:00", "no", "3333333333", "10", "4", "yes", 3000, 600000, 240000, 400000000, 8000000));
+        b.Append(SessionBlock("aaaaaaaa-0000-0000-0000-000000000008", "18", "Пользователь 7", "", "", "1CV8C", ib1, "2026-11-27T23:30:00", "yes", "", "", "", "", -1, -1, -1, -1, -1));
         return b.ToString();
     }
 

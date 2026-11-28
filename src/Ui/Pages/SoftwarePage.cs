@@ -370,17 +370,6 @@ namespace OneCLicenseInspector.Ui
             }
         }
 
-        public class P82Row
-        {
-            public string Pin { get; set; }
-            public string Seats { get; set; }
-            public string Used { get; set; }
-            public string Free { get; set; }
-            public string File { get; set; }
-            public int Count;
-            public int SeatsNum = -1;
-        }
-
         public class FileRow
         {
             public string FileName { get; set; }

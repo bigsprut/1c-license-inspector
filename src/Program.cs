@@ -145,7 +145,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.6.3";
+        public const string Version = "1.7.0";
 
         // Авторство — в одном месте: показывается в статусной строке, в «О программе»,
         // в HTML-отчёте и в дайджесте (28.11.2026 просил Сергей: PrS, bigsprut@mail.ru).

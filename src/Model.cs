@@ -348,6 +348,26 @@ namespace OneCLicenseInspector
         public string Active = "";
         public string Memory = "";
         public string LicenseFile = "";
+
+        // Нагрузка сеанса — счётчики rac (1.7.0). Поля появились в 8.3: у 8.2 и старых rac
+        // их нет вообще, поэтому «не пришло» отделяем от честного нуля значением -1.
+        // rac отдаёт duration-* и cpu-time-* в миллисекундах, bytes-* — в байтах.
+        public long DurationAllMs = -1;         // duration-all: суммарная длительность вызовов
+        public long DurationDbmsMs = -1;        // duration-all-dbms: из них в СУБД
+        public long DurationServiceMs = -1;     // duration-all-service: из них в коде 1С
+        public long CpuTimeMs = -1;             // cpu-time-total
+        public long CallsAll = -1;              // calls-all: сколько было вызовов
+        public long BytesAll = -1;              // bytes-all: данные, отданные клиенту
+        public long DbmsBytesAll = -1;          // dbms-bytes-all: данные из СУБД
+
+        /// <summary>Есть ли о сеансе хоть один показатель нагрузки (иначе вкладку нечем заполнить).</summary>
+        public bool HasLoad
+        {
+            get
+            {
+                return DurationAllMs >= 0 || CpuTimeMs >= 0 || CallsAll >= 0 || BytesAll >= 0 || DbmsBytesAll >= 0;
+            }
+        }
     }
 
     public class ClusterInfo

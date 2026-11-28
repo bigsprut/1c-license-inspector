@@ -18,10 +18,10 @@ namespace OneCLicenseInspector
         {
             if (b < 1024) return b.ToString(CultureInfo.InvariantCulture) + " Б";
             double kb = b / 1024.0;
-            if (kb < 1024) return kb.ToString("0.#", CultureInfo.InvariantCulture) + " КБ";
+            if (kb < 1024) return kb.ToString("0.#", CultureInfo.CurrentCulture) + " КБ";
             double mb = kb / 1024.0;
-            if (mb < 1024) return mb.ToString("0.#", CultureInfo.InvariantCulture) + " МБ";
-            return (mb / 1024.0).ToString("0.##", CultureInfo.InvariantCulture) + " ГБ";
+            if (mb < 1024) return mb.ToString("0.#", CultureInfo.CurrentCulture) + " МБ";
+            return (mb / 1024.0).ToString("0.##", CultureInfo.CurrentCulture) + " ГБ";
         }
 
         public static string Date(DateTime d)
@@ -83,6 +83,21 @@ namespace OneCLicenseInspector
             if (t.TotalDays >= 1) return ((int)t.TotalDays).ToString(CultureInfo.InvariantCulture) + " д " + t.Hours + " ч";
             if (t.TotalHours >= 1) return ((int)t.TotalHours).ToString(CultureInfo.InvariantCulture) + " ч " + t.Minutes + " мин";
             return Math.Max(0, (int)t.TotalSeconds).ToString(CultureInfo.InvariantCulture) + " с";
+        }
+
+        /// <summary>
+        /// Миллисекунды в короткое время для таблиц: «0,4 с», «2:09», «1:02:33».
+        /// Нужно для счётчиков rac (duration-all, cpu-time-total), которые приходят в мс —
+        /// показывать «129000» вместо «2:09» бессмысленно. -1 (поля нет) — пустая строка.
+        /// </summary>
+        public static string Clock(long ms)
+        {
+            if (ms < 0) return "";
+            if (ms < 10000) return (ms / 1000.0).ToString("0.#", CultureInfo.CurrentCulture) + " с";
+            TimeSpan t = TimeSpan.FromMilliseconds(ms);
+            int hours = (int)t.TotalHours;
+            if (hours > 0) return string.Format(CultureInfo.InvariantCulture, "{0}:{1:00}:{2:00}", hours, t.Minutes, t.Seconds);
+            return string.Format(CultureInfo.InvariantCulture, "{0}:{1:00}", t.Minutes, t.Seconds);
         }
 
         public static string N(int n)

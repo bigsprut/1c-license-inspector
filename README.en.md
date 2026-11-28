@@ -31,6 +31,8 @@ and Windows 7/8/10/11.
   the 1C `ring` licensing utility when it is installed.
 - **Sessions and licenses** — who is connected, from which infobase, which license is held
   and how many seats are used (via `rac` and the 1C 8.3 administration server).
+- **Session load** (1.7.0) — who actually loads the cluster: total call duration, CPU time
+  and database traffic per session, sorted from the heaviest one down (`rac` counters).
 - **Reports** — HTML and CSV, plus a silent mode for scheduled runs.
 
 ## Download
@@ -73,6 +75,19 @@ Requirements:
 - cluster administrator credentials if the cluster requires them.
 
 Credentials are entered on the tab and kept in memory only; they never appear in reports.
+
+### Session load (rac)
+
+The **Usage → Load** tab lists the same sessions with their `rac` counters, heaviest first:
+`duration-all` (total call time), `calls-all`, average time per call, `cpu-time-total`
+and `dbms-bytes-all` (database traffic). The session card on the *Sessions and licenses* tab
+breaks the time down into DBMS (`duration-all-dbms`) and 1C code (`duration-all-service`)
+and shows the data sent to the client (`bytes-all`).
+
+Counters are cumulative for the session lifetime and exist only in 1C 8.3; with 1C 8.2 the
+tab says the cluster does not report them instead of showing zeros.
+
+![Session load](docs/img/load.png)
 
 ## HASP4 key contents
 
@@ -161,3 +176,4 @@ Provided as is, without warranty. No license is granted for reuse; contact the a
 | Software licenses | Sessions and licenses |
 |---|---|
 | ![Licenses](docs/img/software.png) | ![Sessions](docs/img/usage.png) |
+| ![Session load](docs/img/load.png) | ![Journal](docs/img/journal.png) |

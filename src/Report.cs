@@ -77,7 +77,7 @@ namespace OneCLicenseInspector
                                  " session=" + s.SessionId + " app=" + s.AppId + " started=" + s.StartedAt +
                                  " lic-type=" + s.LicenseType + " series=" + s.LicenseSeries +
                                  " issued=" + s.IssuedByServer + " max=" + s.MaxUsersCur + "/" + s.MaxUsersAll +
-                                 " short=" + s.LicenseShort + " full=" + s.LicenseFull);
+                                 " short=" + s.LicenseShort + " full=" + s.LicenseFull + LoadText(s));
                 }
                 if (!string.IsNullOrEmpty(c.Raw)) b.AppendLine("=== RAW cluster list ===" + "\r\n" + c.Raw);
                 if (!string.IsNullOrEmpty(c.SessionRaw)) b.AppendLine("=== RAW session list ===" + "\r\n" + c.SessionRaw);
@@ -86,6 +86,23 @@ namespace OneCLicenseInspector
             if (!string.IsNullOrEmpty(logTail)) b.AppendLine("=== ЛОГ ===" + "\r\n" + logTail);
             return b.ToString();
         }
+        /// <summary>
+        /// Нагрузка сеанса одной строкой для дайджеста (1.7.0): по ней видно, кто греет сервер,
+        /// не открывая окно — дайджест забирают с боевых серверов через очередь заданий.
+        /// Пусто, если rac счётчиков не отдал (8.2).
+        /// </summary>
+        private static string LoadText(SessionEntry s)
+        {
+            if (s == null || !s.HasLoad) return "";
+            StringBuilder b = new StringBuilder(" нагрузка=");
+            if (s.CallsAll >= 0) b.Append("вызовов ").Append(s.CallsAll).Append("; ");
+            if (s.DurationAllMs >= 0) b.Append("время ").Append(Fmt.Clock(s.DurationAllMs)).Append("; ");
+            if (s.CpuTimeMs >= 0) b.Append("cpu ").Append(Fmt.Clock(s.CpuTimeMs)).Append("; ");
+            if (s.DbmsBytesAll >= 0) b.Append("бд ").Append(Fmt.Bytes(s.DbmsBytesAll)).Append("; ");
+            if (s.BytesAll >= 0) b.Append("клиенту ").Append(Fmt.Bytes(s.BytesAll)).Append("; ");
+            return b.ToString().TrimEnd(' ', ';');
+        }
+
         public static string BuildHtml(ScanResult r)
         {
             StringBuilder b = new StringBuilder(64 * 1024);

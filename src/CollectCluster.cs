@@ -367,6 +367,7 @@ namespace OneCLicenseInspector
                     s.StartedAt = rec.Get("started-at");
                     s.Hibernate = rec.Get("hibernate");
                     s.LastActivity = rec.Get("last-active-at");
+                    ApplyLoad(s, rec);
                     ApplyLicense(s, rec);
                     c.Sessions.Add(s);
                 }
@@ -650,6 +651,31 @@ namespace OneCLicenseInspector
             long n;
             if (!long.TryParse((v ?? "").Trim(), out n) || n <= 0) return "";
             return (n / 1024).ToString("0");
+        }
+
+        /// <summary>Целое из поля rac; пусто или мусор → -1 («поля нет»), а ноль остаётся нулём.</summary>
+        private static long ParseCounter(string v)
+        {
+            if (string.IsNullOrEmpty(v)) return -1;
+            long n;
+            return long.TryParse(v.Trim(), out n) ? n : -1;
+        }
+
+        /// <summary>
+        /// Счётчики нагрузки сеанса (1.7.0) — те самые поля, по которым в консоли кластера
+        /// видно «кто нагружает сервер». У 8.2 и у старых rac их нет вовсе, поэтому «не пришло»
+        /// храним как -1: честный ноль (сеанс был, но ничего не делал) путать с ним нельзя.
+        /// </summary>
+        private static void ApplyLoad(SessionEntry s, Record rec)
+        {
+            if (s == null || rec == null) return;
+            s.DurationAllMs = ParseCounter(rec.Get("duration-all"));
+            s.DurationDbmsMs = ParseCounter(rec.Get("duration-all-dbms"));
+            s.DurationServiceMs = ParseCounter(rec.Get("duration-all-service"));
+            s.CpuTimeMs = ParseCounter(rec.Get("cpu-time-total"));
+            s.CallsAll = ParseCounter(rec.Get("calls-all"));
+            s.BytesAll = ParseCounter(rec.Get("bytes-all"));
+            s.DbmsBytesAll = ParseCounter(rec.Get("dbms-bytes-all"));
         }
 
         /// <summary>
