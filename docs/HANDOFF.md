@@ -138,7 +138,7 @@
 - `rc=0` и пустой stdout у `rac session list` — это **успех** («сеансов нет»), а не сбой:
   нельзя затирать его ошибкой следующей попытки (было в 1.5.27 и раньше).
 - Запуск exe из PowerShell: `& exe` для GUI-приложения **не ждёт** окончания (файла ещё нет),
-  а `Start-Process -Wait` в этой среде подвисал. Надёжно: `cmd /c "\"dist\1C-License-Inspector.exe\" /args..."`.
+  а `Start-Process -Wait` в этой среде подвисал. Надёжно: `cmd /c "\"build\1C-License-Inspector.exe\" /args..."`.
 - Заглушка rac для автотестов без кластера: `tools\racstub.cs` →
   `csc /out:build\racstub.exe /codepage:65001 tools\racstub.cs`, затем
   `/rac:build\racstub.exe /clusteruser:Администратор /clusterpwd:<любой>` — эмулирует

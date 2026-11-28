@@ -46,8 +46,7 @@ try {
     Get-Process '1C-License-Inspector' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 600
 
-    if (-not (Test-Path 'dist')) { New-Item -ItemType Directory -Path 'dist' -Force | Out-Null }
-    $exeRel = 'dist\1C-License-Inspector.exe'
+    $exeRel = 'build\1C-License-Inspector.exe'
     if (Test-Path $exeRel) { Remove-Item $exeRel -Force }
 
     # 32-битный помощник (встраивается в приложение ресурсом)
@@ -81,13 +80,22 @@ try {
     if ($exit -ne 0) { throw ('Сборка не удалась, код ' + $exit) }
     if (-not (Test-Path $exeRel)) { throw 'Компилятор не создал exe.' }
 
-    # Одна сборка — две одинаковые копии: build\ для запуска и dist\ для релиза.
-    # Раньше они разъезжались по версиям, и можно было случайно запустить старую.
-    try { Copy-Item $exeRel 'dist\1C-License-Inspector.exe' -Force -ErrorAction Stop } catch { }
-
+    # Одна сборка — две одинаковые копии: build\ для запуска, dist\ для релиза.
+    # Копируем и сверяем SHA-256: 28.11.2026 копии разъехались (1.5.40 против 1.5.42),
+    # и можно было запустить старую версию. Теперь расхождение считается провалом сборки.
     $info = Get-Item $exeRel
     $ver = $info.VersionInfo.FileVersion
+    $distRel = 'dist\1C-License-Inspector.exe'
+    if (-not (Test-Path 'dist')) { New-Item -ItemType Directory -Path 'dist' -Force | Out-Null }
+    try { Copy-Item $exeRel $distRel -Force -ErrorAction Stop }
+    catch { Write-Host ('ВНИМАНИЕ: не удалось обновить ' + $distRel + ': ' + $_.Exception.Message) }
+
+    $hashBuild = (Get-FileHash $exeRel -Algorithm SHA256).Hash
+    $hashDist = if (Test-Path $distRel) { (Get-FileHash $distRel -Algorithm SHA256).Hash } else { '' }
+    $same = ($hashBuild -eq $hashDist)
     Write-Host ('Готово: ' + $info.FullName + '  (' + [Math]::Round($info.Length / 1KB) + ' КБ, версия ' + $ver + ')')
+    Write-Host ('Копия:  ' + (Join-Path $root $distRel) + ' — ' + $(if ($same) { 'совпадает' } else { 'НЕ СОВПАЛА' }))
+    if (-not $same) { throw 'Копия в dist\ не совпала с build\ — сборка не считается готовой.' }
 }
 finally {
     Pop-Location

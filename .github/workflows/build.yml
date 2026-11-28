@@ -28,14 +28,14 @@ jobs:
 
       - name: Show build result
         shell: pwsh
-        run: Get-Item dist/1C-License-Inspector.exe | Format-List Name, Length, LastWriteTime
+        run: Get-Item build/1C-License-Inspector.exe | Format-List Name, Length, LastWriteTime
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: 1C-License-Inspector
           path: |
-            dist/1C-License-Inspector.exe
+            build/1C-License-Inspector.exe
             build/Mmc20Dump.exe
           if-no-files-found: error
 
@@ -48,9 +48,9 @@ jobs:
           $tag = "${{ github.ref_name }}"
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag dist/1C-License-Inspector.exe build/Mmc20Dump.exe `
+            gh release create $tag build/1C-License-Inspector.exe build/Mmc20Dump.exe `
               --title "1C License Inspector $tag" `
               --notes "Automated build for $tag"
           } else {
-            gh release upload $tag dist/1C-License-Inspector.exe build/Mmc20Dump.exe --clobber
+            gh release upload $tag build/1C-License-Inspector.exe build/Mmc20Dump.exe --clobber
           }
