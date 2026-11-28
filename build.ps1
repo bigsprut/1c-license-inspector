@@ -1,4 +1,4 @@
-# Сборка «Инспектор лицензий 1С» компилятором .NET Framework 4.0 (csc.exe).
+﻿# Сборка «Инспектор лицензий 1С» компилятором .NET Framework 4.0 (csc.exe).
 # Никаких внешних зависимостей: на выходе один exe, работающий на Windows Server 2003 x64
 # (при установленном .NET Framework 4.0) и на Windows Server 2016/2019/2022.
 #
@@ -100,12 +100,25 @@ try {
         }
     }
 
-    # 32-битный помощник (встраивается в приложение ресурсом)
+    # 32-битный помощник (встраивается в приложение ресурсом).
+    # Файл может быть занят: его открывает RDP-сессия с сервера (как и Worker.exe), тогда
+    # собираем рядом Mmc20Dump-ready.exe и встраиваем его — сам помощник в приложении
+    # нужен как ресурс, а на диске он лежит для ручных опытов.
     $helperRel = 'tools\Mmc20Dump.cs'
     $helperBuilt = $false
+    $helperPath = 'build\Mmc20Dump.exe'
     if (Test-Path $helperRel) {
-        & $csc /nologo /target:exe /platform:x86 /out:build\Mmc20Dump.exe $helperRel
-        if ($LASTEXITCODE -ne 0) { throw 'Не удалось собрать Mmc20Dump.exe' }
+        if (Test-Path $helperPath) {
+            try { Remove-Item $helperPath -Force -ErrorAction Stop } catch { }
+        }
+        & $csc /nologo /target:exe /platform:x86 /out:$helperPath $helperRel
+        if ($LASTEXITCODE -ne 0) {
+            $helperPath = 'build\Mmc20Dump-ready.exe'
+            if (Test-Path $helperPath) { Remove-Item $helperPath -Force -ErrorAction SilentlyContinue }
+            & $csc /nologo /target:exe /platform:x86 /out:$helperPath $helperRel
+            if ($LASTEXITCODE -ne 0) { throw 'Не удалось собрать Mmc20Dump.exe' }
+            Write-Host 'ВНИМАНИЕ: build\Mmc20Dump.exe занят — собран build\Mmc20Dump-ready.exe' -ForegroundColor Yellow
+        }
         $helperBuilt = $true
     }
 
@@ -121,7 +134,7 @@ try {
         '/win32manifest:res\app.manifest'
     )
     if (Test-Path $iconRel) { $cscArgs += ('/win32icon:' + $iconRel) }
-    if ($helperBuilt) { $cscArgs += '/resource:build\Mmc20Dump.exe,Mmc20Dump.exe' }
+    if ($helperBuilt) { $cscArgs += ('/resource:' + $helperPath + ',Mmc20Dump.exe') }
     foreach ($r in $refs) { $cscArgs += ('/reference:' + $r) }
     $cscArgs += $sources
 
