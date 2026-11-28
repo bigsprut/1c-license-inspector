@@ -39,7 +39,7 @@ internal static class Worker
         _done = Path.Combine(_queue, "done");
         _drop = Path.Combine(_root, "drop");
         _work = Path.Combine(Path.GetTempPath(), "1c-inspector-worker");
-        _localApp = Path.Combine(_work, "1cli.exe");
+        _localApp = LocalAppPath();
         _log = Path.Combine(_drop, "worker-" + _name + ".log");
 
         EnsureDir(_queue);
@@ -47,7 +47,8 @@ internal static class Worker
         EnsureDir(_drop);
         EnsureDir(_work);
 
-        KillLeftovers("1cli");
+        KillLeftoversPrefix("1cli");
+        CleanOldCopies();
         KillDuplicateWorkers();
 
         Log("запуск обработчика: имя=" + _name + ", корень=" + _root);
@@ -180,6 +181,62 @@ internal static class Worker
             return FileVersionInfo.GetVersionInfo(appExe).FileVersion;
         }
         catch { return ""; }
+    }
+
+    /// <summary>
+    /// Локальная копия приложения. Имя содержит версию: при обновлении файл называется иначе,
+    /// и Windows (2016 и новее) не показывает старую иконку из своего кэша — он привязан к пути.
+    /// Раньше копия всегда называлась 1cli.exe, и на 2016 в проводнике оставалась старая иконка,
+    /// хотя внутри уже была новая сборка (28.11.2026).
+    /// </summary>
+    private static string LocalAppPath()
+    {
+        string name = "1cli.exe";
+        try
+        {
+            string appExe = AppPath();
+            if (File.Exists(appExe))
+            {
+                string ver = FileVersionInfo.GetVersionInfo(appExe).FileVersion;   // напр. «1.6.2.0»
+                if (!string.IsNullOrEmpty(ver))
+                    name = "1cli-" + ver.Replace('.', '_') + ".exe";
+            }
+        }
+        catch { }
+        return Path.Combine(Path.Combine(Path.GetTempPath(), "1c-inspector-worker"), name);
+    }
+
+    /// <summary>Снять зависшие экземпляры приложения по префиксу (1cli, 1cli-1_6_2 и т. п.).</summary>
+    private static void KillLeftoversPrefix(string prefix)
+    {
+        try
+        {
+            foreach (Process p in Process.GetProcesses())
+            {
+                string n = "";
+                try { n = p.ProcessName; } catch { }
+                if (string.IsNullOrEmpty(n)) continue;
+                if (!n.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+                try { Log("снимаю зависший экземпляр: " + n + " pid=" + p.Id); p.Kill(); } catch { }
+            }
+        }
+        catch { }
+    }
+
+    /// <summary>Удалить прошлые копии приложения (1cli*.exe, кроме текущей).</summary>
+    private static void CleanOldCopies()
+    {
+        try
+        {
+            string dir = Path.GetDirectoryName(_localApp);
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
+            foreach (string f in Directory.GetFiles(dir, "1cli*.exe"))
+            {
+                if (string.Equals(f, _localApp, StringComparison.OrdinalIgnoreCase)) continue;
+                try { File.Delete(f); } catch { }
+            }
+        }
+        catch { }
     }
 
     private static bool SyncApp()
