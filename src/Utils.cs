@@ -555,6 +555,12 @@ namespace OneCLicenseInspector
 
     internal static class Diag
     {
+        /// <summary>
+        /// Запись в журнал отключена: выставляется уборкой следов (1.8.0), чтобы после удаления
+        /// журнала программа не создала его снова.
+        /// </summary>
+        public static bool Muted;
+
         public static string LogPath
         {
             get
@@ -592,6 +598,7 @@ namespace OneCLicenseInspector
 
         public static void Reset()
         {
+            if (Muted) return;
             try
             {
                 System.IO.File.WriteAllText(LogPath, "=== start " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " ===\r\n");
@@ -608,6 +615,7 @@ namespace OneCLicenseInspector
 
         public static void Log(string text)
         {
+            if (Muted) return;
             try { System.IO.File.AppendAllText(LogPath, DateTime.Now.ToString("HH:mm:ss.fff") + "  " + text + "\r\n"); }
             catch { }
             try { System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "1c-license-inspector.log"),

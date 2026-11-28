@@ -380,114 +380,18 @@ internal static class Worker
     }
 
     /// <summary>
-    /// Убрать следы работы с сервера: временные файлы приложения, локальные копии сборки
-    /// и каталог `%ProgramData%\1C-License-Inspector` (там выгрузки отчётов и DPAPI-файл
-    /// с логином/паролем кластера, если их вводили на этом сервере).
-    /// Сам `Worker.exe` удалить нельзя — он запущен; вместо этого пишем cmd, который дочистит
-    /// каталог, как только окно обработчика закроют.
+    /// Убрать следы работы с сервера. Сама уборка живёт в приложении (`Cleanup.Run`, 1.8.0) —
+    /// здесь только вызываем его с ключом `/cleanup:` и возвращаем отчёт. Так логика одна:
+    /// то же самое делает кнопка на странице «Журнал» и ключ `/cleanup` из командной строки.
     /// </summary>
     private static void CleanupServer(List<string> body)
     {
         KillLeftoversPrefix("1cli");
         Thread.Sleep(500);
-
-        long bytes = 0;
-        int files = 0;
-
-        // 1. Временные файлы приложения в %TEMP% сервера.
-        string temp = Path.GetTempPath();
-        string[] tempPatterns = new string[] { "1c-license-inspector*.log", "1c-license-inspector*.txt",
-            "mmc20-*.txt", "mmc20dump.log", "mmc20-*.tsv", "rac-sessions-err.txt" };
-        int tempCount = 0;
-        foreach (string pattern in tempPatterns)
-            tempCount += DeleteMatching(temp, pattern, ref bytes);
-        files += tempCount;
-        body.Add("временные файлы приложения в " + temp + ": " + tempCount);
-
-        // 2. Каталог копий: сама сборка и временные отчёты. Worker.exe не трогаем — он запущен.
-        int workCount = 0;
-        try
-        {
-            if (Directory.Exists(_work))
-            {
-                foreach (string f in Directory.GetFiles(_work))
-                {
-                    if (string.Equals(Path.GetFileName(f), "Worker.exe", StringComparison.OrdinalIgnoreCase)) continue;
-                    try { bytes += new FileInfo(f).Length; File.Delete(f); workCount++; } catch { }
-                }
-            }
-        }
-        catch { }
-        files += workCount;
-        body.Add("копии сборки и временные отчёты в " + _work + ": " + workCount);
-
-        // 3. %ProgramData%\1C-License-Inspector: выгрузки (drop, diag) и cluster.bin с доступами.
-        int progCount = 0;
-        try
-        {
-            string prog = Path.Combine(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "1C-License-Inspector"));
-            if (Directory.Exists(prog))
-            {
-                foreach (string f in Directory.GetFiles(prog, "*", SearchOption.AllDirectories))
-                {
-                    try { bytes += new FileInfo(f).Length; progCount++; } catch { }
-                }
-                Directory.Delete(prog, true);
-            }
-        }
-        catch (Exception ex) { body.Add("ProgramData не удалён: " + ex.Message); }
-        files += progCount;
-        body.Add("каталог 1C-License-Inspector в ProgramData: " + progCount);
-
-        body.Add("итого удалено файлов: " + files + " (" + (bytes / 1024) + " КБ)");
-
-        // 4. Дочистка после закрытия окна: каталог с запущенным Worker.exe сейчас не удалить.
-        try
-        {
-            string selfDel = Path.Combine(temp, "1c-worker-selfdel.cmd");
-            StringBuilder sb = new StringBuilder();
-            sb.AppendLine("@echo off");
-            sb.AppendLine("setlocal");
-            sb.AppendLine("set \"D=" + _work + "\"");
-            sb.AppendLine("for /L %%i in (1,1,120) do (");
-            sb.AppendLine("  del /q \"%D%\\*.*\" >nul 2>&1");
-            sb.AppendLine("  rd /q \"%D%\" >nul 2>&1");
-            sb.AppendLine("  if not exist \"%D%\" goto done");
-            sb.AppendLine("  ping -n 4 127.0.0.1 >nul");
-            sb.AppendLine(")");
-            sb.AppendLine(":done");
-            sb.AppendLine("del /q \"%~f0\" >nul 2>&1");
-            File.WriteAllText(selfDel, sb.ToString(), Encoding.Default);
-            ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/c \"" + selfDel + "\"");
-            psi.UseShellExecute = false;
-            psi.CreateNoWindow = true;
-            psi.WindowStyle = ProcessWindowStyle.Hidden;
-            Process.Start(psi);
-            body.Add("поставлена дочистка: как только закроете окно обработчика, каталог");
-            body.Add("  " + _work);
-            body.Add("  удалится сам вместе с Worker.exe (в течение ~2 минут).");
-        }
-        catch (Exception ex) { body.Add("дочистку поставить не удалось: " + ex.Message); }
-
+        RunAppWithFile(body, "/cleanup:", "cleanup", 120);
         body.Add("");
-        body.Add("Что осталось на сервере: запущенный Worker.exe (пока открыто его окно) и");
-        body.Add("службы/платформа 1С — их мы не ставили и не трогаем. Если запускали ras (start-ras),");
-        body.Add("он продолжит работать: это штатная служба сервера администрирования.");
-    }
-
-    private static int DeleteMatching(string dir, string pattern, ref long bytes)
-    {
-        int n = 0;
-        try
-        {
-            foreach (string f in Directory.GetFiles(dir, pattern))
-            {
-                try { bytes += new FileInfo(f).Length; File.Delete(f); n++; } catch { }
-            }
-        }
-        catch { }
-        return n;
+        body.Add("Приложение, платформа 1С, служба ras и службы HASP не тронуты.");
+        body.Add("Каталог " + _work + " дочистится сам после закрытия окна обработчика.");
     }
 
     private static Process StartApp(string args)

@@ -31,6 +31,9 @@ and Windows 7/8/10/11.
 - **Usage** — 1C and protection processes, services, network ports.
 - **Session load** (1.7.0) — who actually loads the cluster: total call duration, CPU time
   and database traffic per session, sorted from the heaviest one down (`rac` counters).
+- **Trace cleanup** (1.8.0) — the *Journal* page has a “Delete files…” button: removes logs and
+  dumps in `%TEMP%`, worker copies, auto-dropped reports and the saved cluster login/password,
+  with a confirmation and a report. The 1C platform and services are untouched.
 - **Reports** — HTML (for printing and sharing) and CSV, plus a silent mode for scheduled runs.
 
 ## Download

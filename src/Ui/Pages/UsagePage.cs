@@ -1120,10 +1120,11 @@ namespace OneCLicenseInspector.Ui
         private DataGridView _grid;
         private int _gridRow;
         private bool _onlyImportant;
+        private Label _cleanupStatus;
 
         public JournalPage()
         {
-            AddHeader("Журнал", "Что и откуда удалось прочитать при последнем сканировании");
+            AddHeader("Журнал", "Что и откуда удалось прочитать при последнем сканировании; сверху — уборка следов работы");
 
             // Без фильтра важные записи тонули среди «инфо» (24 строки про платформы подряд).
             SegmentedTabs filter = new SegmentedTabs();
@@ -1137,6 +1138,11 @@ namespace OneCLicenseInspector.Ui
             AddRow(filter, 34);
             AddSpacer(6);
 
+            // Блок «убрать следы» (1.8.0) — над журналом: под таблицей он уезжал за нижний край
+            // окна, потому что журнал растягивается на всё доступное место.
+            AddRow(BuildCleanupBar(), 46);
+            AddSpacer(6);
+
             _grid = MakeGrid();
             _grid.Columns.Add(Col("Время", "TimeText", 72));
             _grid.Columns.Add(Col("Уровень", "LevelText", 66));
@@ -1146,6 +1152,72 @@ namespace OneCLicenseInspector.Ui
             // Журнал тоже растёт вместе с окном — иначе при большом окне таблица оставалась
             // маленькой с прокруткой внутри, а вокруг пусто (1.5.60).
             MarkGrowRow(_gridRow, 470);
+        }
+
+        /// <summary>
+        /// Строка «убрать следы работы» (1.8.0): кнопка и короткое описание. Подробности —
+        /// в подтверждении, которое показывает точный список файлов и что мы не трогаем.
+        /// </summary>
+        private Panel BuildCleanupBar()
+        {
+            Panel bar = new Panel();
+            bar.Dock = DockStyle.Fill;
+            bar.BackColor = Color.White;
+            bar.Padding = new Padding(12, 0, 8, 0);
+
+            FlatButton run = new FlatButton();
+            run.Text = "Удалить файлы…";
+            run.Kind = ButtonKind.Secondary;
+            run.Icon = "refresh";
+            run.Size = new Size(172, 28);
+            run.Dock = DockStyle.Right;
+            run.Margin = new Padding(0, 8, 8, 8);
+            run.Click += delegate { RunCleanup(); };
+            // Dock не учитывает Margin у докованных кнопок — сдвигаем вручную.
+            run.Padding = new Padding(0, 8, 0, 8);
+
+            _cleanupStatus = new Label();
+            _cleanupStatus.Dock = DockStyle.Fill;
+            _cleanupStatus.Font = Theme.Small;
+            _cleanupStatus.ForeColor = Theme.Muted;
+            _cleanupStatus.Padding = new Padding(0, 6, 12, 0);
+            _cleanupStatus.Text = "Убрать следы работы: журнал и дампы в %TEMP%, копии для сервера, " +
+                                  "выгрузки в ProgramData и сохранённые логин/пароль кластера. " +
+                                  "Платформу 1С, службу ras, службы и ключи HASP не трогаем.";
+
+            bar.Controls.Add(_cleanupStatus);
+            bar.Controls.Add(run);
+            return bar;
+        }
+
+        /// <summary>Спросить подтверждение, убрать следы и показать отчёт.</summary>
+        private void RunCleanup()
+        {
+            string plan;
+            try { plan = Cleanup.Describe(); }
+            catch (Exception ex) { plan = "Не удалось посмотреть список файлов: " + ex.Message; }
+
+            DialogResult answer = MessageBox.Show(
+                "Удалить следы работы программы на этом компьютере?\r\n\r\n" + plan + "\r\n\r\n" +
+                "Вместе с ними удалятся сохранённые логин и пароль кластера (если их вводили здесь) " +
+                "и выгрузки отчётов в ProgramData.\r\n\r\n" +
+                "Не тронем: платформу 1С, службу ras, службы и ключи HASP.\r\n\r\nПродолжить?",
+                "Убрать следы работы",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+            if (answer != DialogResult.Yes) return;
+
+            string report;
+            Cursor previous = Cursor;
+            Cursor = Cursors.WaitCursor;
+            try { report = Cleanup.Run(); }
+            catch (Exception ex) { report = "Сбой уборки: " + ex.Message; }
+            finally { Cursor = previous; }
+
+            if (_cleanupStatus != null)
+                _cleanupStatus.Text = "Готово. Журнал этой сессии закрыт — новые записи не пишутся. " +
+                                      "Отчёт об уборке — в окне.";
+            MessageBox.Show(report, "Уборка следов: отчёт",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private DataGridViewColumn Col(string header, string prop, int weight)
@@ -1182,9 +1254,13 @@ namespace OneCLicenseInspector.Ui
             });
             _grid.DataSource = null;
             _grid.DataSource = rows;
-            // Журнал занимает всё доступное место, но не меньше 8 строк.
-            int h = FitGridHeight(_grid, rows.Count, 220, 2000);
-            SetRowHeight(_gridRow, Root.Height - 120 > h ? Root.Height - 120 : h);
+            // Журнал занимает всё доступное место, но снизу надо оставить место под блок
+            // «убрать следы» (1.8.0): раньше высота считалась от всего окна, и карточка
+            // уезжала за нижний край — её просто не было видно.
+            int reserve = 34 + 6 + 46 + 6 + 14;
+            int h = FitGridHeight(_grid, rows.Count, 200, 2000);
+            int avail = ClientSize.Height - Padding.Vertical - reserve;
+            SetRowHeight(_gridRow, avail > h ? avail : h);
         }
 
         public class Row

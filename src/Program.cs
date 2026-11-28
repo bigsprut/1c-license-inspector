@@ -146,7 +146,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.7.1";
+        public const string Version = "1.8.0";
 
         // Авторство — в одном месте: показывается в статусной строке, в «О программе»,
         // в HTML-отчёте и в дайджесте (28.11.2026 просил Сергей: PrS, bigsprut@mail.ru).
@@ -390,6 +390,18 @@ namespace OneCLicenseInspector
                     ScanResult dr = Scanner.Run(null);
                     WriteText(digest, Report.BuildDigest(dr, Diag.Tail(60000)), true);
                     System.Environment.Exit(0); // COM/HTTP-потоки не должны держать процесс живым
+                    return 0;
+                }
+
+                // Уборка следов (1.8.0): /cleanup — напечатать отчёт, /cleanup:<файл> — записать.
+                // Ничего не сканируем: это работа с файлами, а не с лицензиями.
+                if (Has(args, "/cleanup") || Arg(args, "/cleanup").Length > 0)
+                {
+                    string cleanupPath = Arg(args, "/cleanup");
+                    string cleanupText = Cleanup.Run();
+                    if (!string.IsNullOrEmpty(cleanupPath)) WriteText(cleanupPath, cleanupText, true);
+                    else Console.WriteLine(cleanupText);
+                    System.Environment.Exit(0);
                     return 0;
                 }
 
