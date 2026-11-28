@@ -31,6 +31,19 @@ namespace OneCLicenseInspector
             }
             b.AppendLine();
 
+            // Вывод ring — единственный внешний источник PIN/редакции/мест для зашифрованных
+            // файлов 8.2. Кладём в дайджест, чтобы его можно было прислать для разбора.
+            if (!string.IsNullOrEmpty(r.LicenseRing) || !string.IsNullOrEmpty(r.LicenseRingOutput))
+            {
+                b.AppendLine("Утилита лицензирования ring: " + (string.IsNullOrEmpty(r.LicenseRing) ? "не найдена" : r.LicenseRing));
+                if (!string.IsNullOrEmpty(r.LicenseRingOutput))
+                {
+                    string ringText = r.LicenseRingOutput;
+                    if (ringText.Length > 4000) ringText = ringText.Substring(0, 4000) + "…";
+                    b.AppendLine(ringText);
+                }
+                b.AppendLine();
+            }
             // Лицензии по данным консоли 8.2: файлы *.lic в 8.2 зашифрованы, поэтому серия,
             // места и занятость берутся из консоли администрирования.
             if (r.Cluster != null)
