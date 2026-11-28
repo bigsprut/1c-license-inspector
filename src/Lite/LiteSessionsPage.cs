@@ -32,8 +32,11 @@ namespace OneCLicenseInspector.Lite
                              "компьютера вообще, поэтому адрес — единственное, что известно о машине.";
             Col(_grid, "Инф. база", "Infobase", 105, "");
             Col(_grid, "№", "Number", 55, "");
-            Col(_grid, "Начало", "Started", 100, "");
-            Col(_grid, "Приложение", "App", 115, "");
+            Col(_grid, "Начало", "Started", 95, "");
+            DataGridViewColumn act = Col(_grid, "Активность", "Activity", 105, "");
+            act.ToolTipText = "Последняя активность сеанса по данным rac (last-active-at): у работающего — " +
+                              "совсем свежая, у спящего — когда он последний раз работал.";
+            Col(_grid, "Приложение", "App", 110, "");
             Col(_grid, "Состояние", "State", 85, "");
             DataGridViewColumn seats = Col(_grid, "Мест / занято", "SeatsBusy", 95, "");
             seats.ToolTipText = "Слева — ёмкость лицензии, справа — сколько сеансов её держат. " +
@@ -113,11 +116,11 @@ namespace OneCLicenseInspector.Lite
             ScanResult r = Snapshot;
             b.AppendLine("Использование лицензий 1С " + Program.Version +
                          (r == null ? "" : " · " + r.System.ComputerName + " · " + Fmt.Date(r.Finished)));
-            b.AppendLine("Рег. номер\tПользователь\tКомпьютер\tIP\tИнф. база\t№\tНачало\tПриложение\tСостояние\tМест / занято");
+            b.AppendLine("Рег. номер\tПользователь\tКомпьютер\tIP\tИнф. база\t№\tНачало\tАктивность\tПриложение\tСостояние\tМест / занято");
             foreach (Ui.LicenseUsagePage.SessionRow s in _items)
             {
                 b.AppendLine(string.Join("\t", new string[] { s.Pin, s.User, s.Host, s.Ip, s.Infobase,
-                    s.Number, s.Started, s.App, s.State, s.SeatsBusy }));
+                    s.Number, s.Started, s.Activity, s.App, s.State, s.SeatsBusy }));
             }
             return b.ToString();
         }

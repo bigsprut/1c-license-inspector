@@ -97,6 +97,8 @@ namespace OneCLicenseInspector.Ui
                     row.Number = string.IsNullOrEmpty(se.SessionNum) ? se.SessionId : se.SessionNum;
                     if (row.Number.Length > 10) row.Number = row.Number.Substring(0, 8) + "…";
                     row.Started = ShortDate(se.StartedAt);
+                    // Последняя активность — по ней видно, работает человек или сеанс просто висит.
+                    row.Activity = ShortDate(se.LastActivity);
                     row.App = Fmt.AppName(se.AppId);
                     bool sleeping = string.Equals(se.Hibernate, "yes", StringComparison.OrdinalIgnoreCase);
                     row.State = string.IsNullOrEmpty(se.Hibernate) ? "" : (sleeping ? "спит" : "активен");

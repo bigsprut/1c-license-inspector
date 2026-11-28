@@ -245,6 +245,9 @@ namespace OneCLicenseInspector.Ui
             _sessions.Columns.Add(Col("Инф. база", "Infobase", 100));
             _sessions.Columns.Add(Col("Номер", "SessionId", 60));
             _sessions.Columns.Add(Col("Начало", "StartedAt", 100));
+            DataGridViewColumn actCol = Col("Активность", "Activity", 100);
+            actCol.ToolTipText = "Последняя активность сеанса по данным rac (last-active-at).";
+            _sessions.Columns.Add(actCol);
             _sessions.Columns.Add(Col("Компьютер", "Host", 105));
             // «IP» и «Лицензия» убраны с пятой страницы в 1.5.58: адрес клиента и тип лицензии
             // видны в карточке сеанса ниже, а в таблице 13 столбцов не помещались (подписи
@@ -584,6 +587,7 @@ namespace OneCLicenseInspector.Ui
                 // обрезался в «aaaaaaaaa…» и ничего не говорил.
                 row.SessionId = string.IsNullOrEmpty(s.SessionNum) ? ShortId(s.SessionId) : s.SessionNum;
                 row.StartedAt = ShortDate(s.StartedAt);
+                row.Activity = ShortDate(s.LastActivity);
                 row.Host = s.Host;
                 row.User = string.IsNullOrEmpty(s.User) ? "—" : s.User;
                 row.AppId = Fmt.AppName(s.AppId);
@@ -873,6 +877,8 @@ namespace OneCLicenseInspector.Ui
             public string Infobase { get; set; }
             public string SessionId { get; set; }
             public string StartedAt { get; set; }
+            /// <summary>Время последней активности из rac (last-active-at).</summary>
+            public string Activity { get; set; }
             public string Host { get; set; }
             public string User { get; set; }
             public string AppId { get; set; }

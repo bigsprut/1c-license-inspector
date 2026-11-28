@@ -124,7 +124,8 @@ internal static class RacStub
         b.Append("app-id         : ").Append(app).Append('\n');
         b.Append("infobase       : ").Append(infobase).Append('\n');
         b.Append("started-at     : ").Append(started).Append('\n');
-        b.Append("last-active-at : ").Append(started).Append('\n');
+        // Активные сеансы «работали» только что, спящие — когда их оставили.
+        b.Append("last-active-at : ").Append(hibernate == "yes" ? started : "2026-11-28T16:55:00").Append('\n');
         b.Append("hibernate      : ").Append(hibernate).Append('\n');
         if (!string.IsNullOrEmpty(series))
         {

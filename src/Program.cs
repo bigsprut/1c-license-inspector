@@ -145,7 +145,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.6.0";
+        public const string Version = "1.6.1";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -546,13 +546,13 @@ namespace OneCLicenseInspector
             p1.Enabled = "Да"; p1.Active = "Да"; p1.LicenseShort = "Сервер, 0000000000 1 1";
             SessionEntry s1 = new SessionEntry();
             s1.User = "Пользователь 1"; s1.Host = "PC-1"; s1.Infobase = "buh"; s1.SessionId = "7431";
-            s1.AppId = "Тонкий клиент"; s1.StartedAt = "25.11.2026 10:12:46"; s1.LicenseShort = "Сервер, 1111111111 20 20";
+            s1.AppId = "Тонкий клиент"; s1.StartedAt = "25.11.2026 10:12:46"; s1.LastActivity = "25.11.2026 10:41:00"; s1.LicenseShort = "Сервер, 1111111111 20 20";
             sr.Cluster.Processes.Add(p1);
             sr.Cluster.Sessions.Add(s1);
 
             SessionEntry s2 = new SessionEntry();
             s2.User = "Пользователь 2"; s2.Host = "PC-2"; s2.Infobase = "buh"; s2.SessionNum = "7432";
-            s2.AppId = "1CV8C"; s2.StartedAt = "2026-11-28T09:15:00"; s2.Hibernate = "no";
+            s2.AppId = "1CV8C"; s2.StartedAt = "2026-11-28T09:15:00"; s2.LastActivity = "2026-11-28T09:42:00"; s2.Hibernate = "no";
             s2.LicenseType = "программная"; s2.LicenseSeries = "3333333333"; s2.IssuedByServer = "да";
             s2.MaxUsersAll = "5"; s2.MaxUsersCur = "2"; s2.LicenseShort = "1С:Предприятие 8 (5)";
             sr.Cluster.Sessions.Add(s2);

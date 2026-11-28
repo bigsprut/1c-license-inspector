@@ -69,22 +69,29 @@ namespace OneCLicenseInspector.Ui
             AddSpacer(6);
 
             _sessions = MakeGrid();
-            _sessions.Columns.Add(Col("Рег. номер", "Pin", 95));
-            _sessions.Columns.Add(Col("Пользователь", "User", 145));
+            _sessions.Columns.Add(Col("Рег. номер", "Pin", 105));
+            _sessions.Columns.Add(Col("Пользователь", "User", 140));
             _sessions.Columns.Add(Col("Компьютер", "Host", 100));
             DataGridViewColumn ipCol = Col("IP", "Ip", 95);
             ipCol.ToolTipText = "Адрес клиента из rac (client-ip). У спящего сеанса 1С не отдаёт имя " +
                                 "компьютера вообще, поэтому адрес — единственное, что известно о машине.";
             _sessions.Columns.Add(ipCol);
-            _sessions.Columns.Add(Col("Инф. база", "Infobase", 100));
-            _sessions.Columns.Add(Col("№", "Number", 60));
-            _sessions.Columns.Add(Col("Начало", "Started", 100));
-            _sessions.Columns.Add(Col("Приложение", "App", 120));
-            _sessions.Columns.Add(Col("Состояние", "State", 90));
+            _sessions.Columns.Add(Col("Инф. база", "Infobase", 105));
+            // «№» убран с первой страницы в 1.6.1: 11 столбцов не помещались, а номер сеанса
+            // виден в карточке (на первой странице карточки нет — там номер есть в копировании).
+            _sessions.Columns.Add(Col("Начало", "Started", 105));
+            // Активность — время последнего обращения из rac (last-active-at): по нему видно,
+            // кто действительно работает, а кто просто держит сеанс открытым (или спит).
+            DataGridViewColumn actCol = Col("Активность", "Activity", 100);
+            actCol.ToolTipText = "Последняя активность сеанса по данным rac (last-active-at): " +
+                                 "«сейчас» у работающего, а у спящего — когда он последний раз работал.";
+            _sessions.Columns.Add(actCol);
+            _sessions.Columns.Add(Col("Приложение", "App", 125));
+            _sessions.Columns.Add(Col("Состояние", "State", 85));
             // Тип лицензии не дублируем (он в таблице лицензий выше), а «активность» перенесли
             // в карточку сеанса на странице «Использование»: 11 столбцов при 5–10 сеансах
             // не помещались, и подписи обрезались до «Пользовате…».
-            DataGridViewColumn seatsCol = Col("Мест / занято", "SeatsBusy", 90);
+            DataGridViewColumn seatsCol = Col("Мест / занято", "SeatsBusy", 85);
             seatsCol.ToolTipText = "Слева — ёмкость лицензии, справа — сколько сеансов держат её сейчас. " +
                                    "У серверной лицензии вместо числа «сервер»: её занимает работающий сервер, а не сеансы.";
             _sessions.Columns.Add(seatsCol);
@@ -170,10 +177,10 @@ namespace OneCLicenseInspector.Ui
             }
             b.AppendLine();
             b.AppendLine("ИСПОЛЬЗОВАНИЕ ЛИЦЕНЗИЙ СЕАНСАМИ (" + _sessionItems.Count + ")");
-            b.AppendLine("Рег. номер\tПользователь\tКомпьютер\tIP\tИнф. база\t№\tНачало\tПриложение\tСостояние\tМест / занято");
+            b.AppendLine("Рег. номер\tПользователь\tКомпьютер\tIP\tИнф. база\t№\tНачало\tАктивность\tПриложение\tСостояние\tМест / занято");
             foreach (SessionRow s in _sessionItems)
             {
-                b.AppendLine(Join(s.Pin, s.User, s.Host, s.Ip, s.Infobase, s.Number, s.Started,
+                b.AppendLine(Join(s.Pin, s.User, s.Host, s.Ip, s.Infobase, s.Number, s.Started, s.Activity,
                                   s.App, s.State, s.SeatsBusy));
             }
             return b.ToString();
@@ -230,7 +237,7 @@ namespace OneCLicenseInspector.Ui
             public SessionRow()
             {
                 Pin = ""; User = ""; Host = ""; Ip = ""; Infobase = ""; Number = ""; Started = "";
-                App = ""; State = ""; Seats = ""; Busy = "";
+                App = ""; State = ""; Seats = ""; Busy = ""; Activity = "";
             }
 
             public string Pin { get; set; }
@@ -241,6 +248,8 @@ namespace OneCLicenseInspector.Ui
             public string Infobase { get; set; }
             public string Number { get; set; }
             public string Started { get; set; }
+            /// <summary>Время последней активности из rac (last-active-at).</summary>
+            public string Activity { get; set; }
             public string App { get; set; }
             public string State { get; set; }
             public string Seats { get; set; }
