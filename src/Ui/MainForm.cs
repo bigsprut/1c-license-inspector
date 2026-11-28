@@ -18,6 +18,7 @@ namespace OneCLicenseInspector.Ui
         public FlatButton Copy;
         public string Machine = "";
         public string Subtitle = "";
+        public string Title = "Инспектор лицензий 1С";
         private bool _busy;
 
         public HeaderPanel()
@@ -99,7 +100,7 @@ namespace OneCLicenseInspector.Ui
             int titleH = Dpi.S(g, 34);
             using (Font tf = Theme.Font(14f, FontStyle.Bold))
             {
-                TextRenderer.DrawText(g, "Инспектор лицензий 1С", tf, new Rectangle(textLeft, Dpi.S(g, 12), textW, titleH), Color.White,
+                TextRenderer.DrawText(g, Title, tf, new Rectangle(textLeft, Dpi.S(g, 12), textW, titleH), Color.White,
                     TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
             }
             TextRenderer.DrawText(g, Subtitle, Theme.Body, new Rectangle(textLeft + Dpi.S(g, 1), Dpi.S(g, 12) + titleH, textW, Dpi.S(g, 26)), Color.FromArgb(168, 183, 198),

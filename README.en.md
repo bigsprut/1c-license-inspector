@@ -8,6 +8,10 @@ An unofficial Windows utility that audits **1C:Enterprise** licenses on a single
 installed platforms, hardware protection keys, software licenses, active sessions
 and the licenses they hold.
 
+There is also a **quick build** — `1C-License-Inspector-Lite.exe` (since 1.6.0) with just two
+tabs, **Licenses** and **License usage**. It skips hardware keys (Sentinel/HASP), services and
+ports, so it starts noticeably faster; both programs share the same collectors, so the numbers
+match. Screenshots: `docs/img/lite-licenses.png`, `docs/img/lite-usage.png`.
 One self-contained exe, no installation and no third-party libraries. Runs on
 **Windows Server 2003 x64** (with .NET Framework 4.0), **Windows Server 2016/2019/2022**
 and Windows 7/8/10/11.

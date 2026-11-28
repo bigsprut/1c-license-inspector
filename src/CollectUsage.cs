@@ -34,6 +34,17 @@ namespace OneCLicenseInspector
             r.AddLog(LogLevel.Info, "Использование", "Процессов 1С: " + oneCProcs + ", служб: " + r.Services.Count + ", портов: " + r.Ports.Count);
         }
 
+        /// <summary>
+        /// Только процессы — для краткого приложения: список процессов нужен, чтобы понять,
+        /// занята ли серверная лицензия (ragent/rphost/rmngr). Службы и порты не собираем:
+        /// это самое медленное и на двух вкладках не показывается.
+        /// </summary>
+        public static void RunProcessesOnly(ScanResult r)
+        {
+            CollectProcesses(r);
+            r.AddLog(LogLevel.Info, "Использование", "Процессов найдено: " + r.Processes.Count + " (службы и порты не собирались)");
+        }
+
         private static void CollectProcesses(ScanResult r)
         {
             try

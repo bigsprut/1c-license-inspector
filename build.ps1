@@ -1,4 +1,4 @@
-﻿# Сборка «Инспектор лицензий 1С» компилятором .NET Framework 4.0 (csc.exe).
+# Сборка «Инспектор лицензий 1С» компилятором .NET Framework 4.0 (csc.exe).
 # Никаких внешних зависимостей: на выходе один exe, работающий на Windows Server 2003 x64
 # (при установленном .NET Framework 4.0) и на Windows Server 2016/2019/2022.
 #
@@ -47,7 +47,26 @@ try {
     Start-Sleep -Milliseconds 600
 
     $exeRel = 'build\1C-License-Inspector.exe'
-    if (Test-Path $exeRel) { Remove-Item $exeRel -Force }
+    # Файл иногда остаётся занятым после предыдущего запуска (антивирус, просмотр файла в
+    # проводнике/редакторе): пробуем несколько раз, а если так и не отпустил — собираем
+    # рядом (`...new.exe`) и обновляем dist оттуда. Иначе сборка падала на пустом месте.
+    $outRel = $exeRel
+    for ($i = 0; $i -lt 12; $i++) {
+        if (-not (Test-Path $exeRel)) { break }
+        try { Remove-Item $exeRel -Force -ErrorAction Stop; break }
+        catch { Start-Sleep -Milliseconds 400 }
+    }
+    if (Test-Path $exeRel) {
+        Get-Process '1C-License-Inspector' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 800
+        $canDelete = $false
+        try { Remove-Item $exeRel -Force -ErrorAction Stop; $canDelete = $true } catch { }
+        if (-not $canDelete) {
+            $outRel = 'build\1C-License-Inspector.new.exe'
+            Write-Host ('ВНИМАНИЕ: ' + $exeRel + ' занят посторонним процессом — собираю в ' + $outRel)
+            if (Test-Path $outRel) { Remove-Item $outRel -Force -ErrorAction SilentlyContinue }
+        }
+    }
 
     # Обработчик очереди для удалённого тестирования (C#, без PowerShell).
     # Собираем во временный файл: build\Worker.exe может быть занят запущенным на сервере
@@ -83,7 +102,8 @@ try {
         '/optimize+',
         '/codepage:65001',
         '/warn:4',
-        ('/out:' + $exeRel),
+        '/main:OneCLicenseInspector.Program',
+        ('/out:' + $outRel),
         '/win32manifest:res\app.manifest'
     )
     if (Test-Path $iconRel) { $cscArgs += ('/win32icon:' + $iconRel) }
@@ -96,24 +116,53 @@ try {
     if (-not $Quiet -or $exit -ne 0) { $log | ForEach-Object { Write-Host $_ } }
 
     if ($exit -ne 0) { throw ('Сборка не удалась, код ' + $exit) }
-    if (-not (Test-Path $exeRel)) { throw 'Компилятор не создал exe.' }
+    if (-not (Test-Path $outRel)) { throw 'Компилятор не создал exe.' }
+
+    # Краткое приложение: те же исходники, другая точка входа и своё окно (две вкладки).
+    $liteRel = 'build\1C-License-Inspector-Lite.exe'
+    if (Test-Path $liteRel) {
+        for ($i = 0; $i -lt 6; $i++) {
+            try { Remove-Item $liteRel -Force -ErrorAction Stop; break } catch { Start-Sleep -Milliseconds 300 }
+        }
+    }
+    $liteArgs = @()
+    foreach ($a in $cscArgs) {
+        if ($a -like '/out:*') { $liteArgs += ('/out:' + $liteRel); continue }
+        if ($a -eq '/main:OneCLicenseInspector.Program') { $liteArgs += '/main:OneCLicenseInspector.Lite.LiteProgram'; continue }
+        $liteArgs += $a
+    }
+    Get-Process '1C-License-Inspector-Lite' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    $logLite = & $csc $liteArgs 2>&1
+    $exitLite = $LASTEXITCODE
+    if (-not $Quiet -or $exitLite -ne 0) { $logLite | ForEach-Object { Write-Host $_ } }
+    if ($exitLite -ne 0) { throw ('Сборка краткого приложения не удалась, код ' + $exitLite) }
+    if (-not (Test-Path $liteRel)) { throw 'Компилятор не создал exe краткого приложения.' }
 
     # Одна сборка — две одинаковые копии: build\ для запуска, dist\ для релиза.
     # Копируем и сверяем SHA-256: 28.11.2026 копии разъехались (1.5.40 против 1.5.42),
     # и можно было запустить старую версию. Теперь расхождение считается провалом сборки.
-    $info = Get-Item $exeRel
+    $info = Get-Item $outRel
     $ver = $info.VersionInfo.FileVersion
     $distRel = 'dist\1C-License-Inspector.exe'
+    $distLiteRel = 'dist\1C-License-Inspector-Lite.exe'
     if (-not (Test-Path 'dist')) { New-Item -ItemType Directory -Path 'dist' -Force | Out-Null }
-    try { Copy-Item $exeRel $distRel -Force -ErrorAction Stop }
+    try { Copy-Item $outRel $distRel -Force -ErrorAction Stop }
     catch { Write-Host ('ВНИМАНИЕ: не удалось обновить ' + $distRel + ': ' + $_.Exception.Message) }
+    try { Copy-Item $liteRel $distLiteRel -Force -ErrorAction Stop }
+    catch { Write-Host ('ВНИМАНИЕ: не удалось обновить ' + $distLiteRel + ': ' + $_.Exception.Message) }
 
-    $hashBuild = (Get-FileHash $exeRel -Algorithm SHA256).Hash
+    $hashBuild = (Get-FileHash $outRel -Algorithm SHA256).Hash
     $hashDist = if (Test-Path $distRel) { (Get-FileHash $distRel -Algorithm SHA256).Hash } else { '' }
     $same = ($hashBuild -eq $hashDist)
+    $hashLite = (Get-FileHash $liteRel -Algorithm SHA256).Hash
+    $hashLiteDist = if (Test-Path $distLiteRel) { (Get-FileHash $distLiteRel -Algorithm SHA256).Hash } else { '' }
+    $sameLite = ($hashLite -eq $hashLiteDist)
     Write-Host ('Готово: ' + $info.FullName + '  (' + [Math]::Round($info.Length / 1KB) + ' КБ, версия ' + $ver + ')')
     Write-Host ('Копия:  ' + (Join-Path $root $distRel) + ' — ' + $(if ($same) { 'совпадает' } else { 'НЕ СОВПАЛА' }))
+    Write-Host ('Кратко: ' + (Join-Path $root $liteRel) + '  (' + [Math]::Round((Get-Item $liteRel).Length / 1KB) + ' КБ)')
+    Write-Host ('Копия:  ' + (Join-Path $root $distLiteRel) + ' — ' + $(if ($sameLite) { 'совпадает' } else { 'НЕ СОВПАЛА' }))
     if (-not $same) { throw 'Копия в dist\ не совпала с build\ — сборка не считается готовой.' }
+    if (-not $sameLite) { throw 'Копия краткого приложения в dist\ не совпала — сборка не считается готовой.' }
 }
 finally {
     Pop-Location

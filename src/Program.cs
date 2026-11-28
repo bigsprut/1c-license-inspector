@@ -47,6 +47,39 @@ namespace OneCLicenseInspector
             return r;
         }
 
+        /// <summary>
+        /// Быстрый сбор для краткого приложения (две вкладки): только то, что нужно таблицам
+        /// «Лицензии» и «Использование лицензий». Аппаратные ключи (Sentinel LDK/HASP4), службы,
+        /// порты и выгрузка отчётов в drop не собираются — на этом и экономится время запуска.
+        /// </summary>
+        public static ScanResult RunQuick(Action<string> progress)
+        {
+            Diag.Reset();
+            Diag.Log("scan(quick): begin");
+            ScanResult r = new ScanResult();
+            r.Started = DateTime.Now;
+            Report1(progress, "Сбор сведений о компьютере…");
+            Diag.Log("scan(quick): system");
+            SafeRun(r, "Система", delegate { CollectSystem.Run(r); });
+            Report1(progress, "Поиск платформ 1С…");
+            SafeRun(r, "Платформы", delegate { CollectPlatforms.Run(r); });
+            Report1(progress, "Поиск файлов программных лицензий…");
+            SafeRun(r, "Лицензии", delegate { CollectLicenses.Run(r); });
+            Report1(progress, "Процессы сервера 1С…");
+            SafeRun(r, "Использование", delegate { CollectUsage.RunProcessesOnly(r); });
+            Report1(progress, "Опрос кластера 1С…");
+            SafeRun(r, "Кластер", delegate { CollectCluster.Run(r, Program.RasEndpoint, Program.ClusterUser, Program.ClusterPwd); });
+            try { AutoConsole82.TryAutoCollect(r); } catch { }
+            SafeRun(r, "Лицензии", delegate { CollectLicenses.MatchUsage(r); });
+
+            r.Finished = DateTime.Now;
+            CrossCheck(r);
+            Diag.Log("scan(quick): done");
+            r.MachineInfo = r.System.ComputerName + " · " + r.System.OsCaption + " " + r.System.OsArch;
+            Report1(progress, "Готово");
+            return r;
+        }
+
         private static void SafeRun(ScanResult r, string name, Action action)
         {
             try
@@ -112,7 +145,7 @@ namespace OneCLicenseInspector
 
     internal static class Program
     {
-        public const string Version = "1.5.60";
+        public const string Version = "1.6.0";
         public static string LastReportPath = "";
         public static string RacOverride = "";
         public static string HaspInfoOverride = "";
@@ -506,7 +539,7 @@ namespace OneCLicenseInspector
         /// выданной сервером, и два файла лицензий — бессрочная клиентская и серверная со сроком.
         /// Вызывать после MaskForDemo, иначе PIN-ы замаскируются и перестанут совпадать с сериями.
         /// </summary>
-        private static void AddDemo82(ScanResult sr)
+        internal static void AddDemo82(ScanResult sr)
         {
             SessionEntry p1 = new SessionEntry();
             p1.User = "SERVER"; p1.Host = ":1565"; p1.SessionId = "4868"; p1.AppId = "Использовать";
