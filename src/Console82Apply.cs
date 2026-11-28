@@ -11,6 +11,16 @@ namespace OneCLicenseInspector
             summary = "";
             if (r == null || string.IsNullOrEmpty(text)) return false;
 
+            // Сырой дамп таблицы 8.2 кладём в drop: без него не видно, какие колонки
+            // и какие значения реально отдаёт консоль на конкретном сервере.
+            try
+            {
+                string dump = System.IO.Path.Combine(AutoDrop.Dir(),
+                    Console82Import.LooksLikeProcesses(text) ? "latest-82-processes.txt" : "latest-82-sessions.txt");
+                System.IO.File.WriteAllText(dump, text, new System.Text.UTF8Encoding(true));
+            }
+            catch { }
+
             if (Console82Import.LooksLikeProcesses(text))
             {
                 List<Console82Import.ProcRow> procs = Console82Import.ParseProcesses(text);

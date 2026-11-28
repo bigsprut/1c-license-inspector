@@ -40,7 +40,8 @@ namespace OneCLicenseInspector
                 string[] cells = line.Split('\t');
                 if (cells.Length < 5) continue;
 
-                bool isHeader = line.IndexOf("Номер сеанса", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                bool isHeader = (line.IndexOf("Номер сеанса", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                 line.IndexOf("Сеанс", StringComparison.OrdinalIgnoreCase) >= 0) &&
                                 line.IndexOf("Пользователь", StringComparison.OrdinalIgnoreCase) >= 0;
                 if (isHeader)
                 {
@@ -205,7 +206,8 @@ namespace OneCLicenseInspector
                 string[] c = line.Split('\t');
                 if (c.Length < 4) continue;
                 if (line.IndexOf("Порт", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                    line.IndexOf("Лицензия", StringComparison.OrdinalIgnoreCase) >= 0)
+                    (line.IndexOf("Лицензия", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     line.IndexOf("PID", StringComparison.OrdinalIgnoreCase) >= 0))
                 {
                     header = c;
                     for (int i = 0; i < header.Length; i++)
